@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "DedupWinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "DedupWinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

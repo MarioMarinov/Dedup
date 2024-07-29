@@ -1,9 +1,11 @@
-﻿using Services.Models;
+﻿using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Services.Models;
 using System;
 using System.Drawing;
 using System.IO;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Windows.Graphics.Imaging;
+
 
 namespace DedupWinUI.ViewModels
 {
@@ -16,24 +18,18 @@ namespace DedupWinUI.ViewModels
         public string FilePath { get { return Model.FilePath; } }
         public long Length { get { return Model.Length; } }
         public Size Dimensions { get; private set; }
-        private BitmapImage _thumbnail;
-        public BitmapImage Thumbnail
+        private ImageSource _thumbnail;
+        public ImageSource Thumbnail
         {
             get { return _thumbnail; }
             set
             {
                 _thumbnail = value;
                 RaisePropertyChanged(nameof(Thumbnail));
-                //var enc = new PngBitmapEncoder();
-                //enc.Frames.Add(BitmapFrame.Create(value));
-                //var fileStream = new FileStream(@"D:\Temp\ThumbailTest.png", FileMode.Create);
-                //enc.Save(fileStream);
-                //fileStream.Close();
             }
         }
 
-
-        public BitmapSource HashImage { get; set; }
+        public Bitmap HashImage { get; set; }
 
         private ImageModel _model;
         public ImageModel Model
@@ -48,6 +44,7 @@ namespace DedupWinUI.ViewModels
                 }
             }
         }
+
         public ImageViewModel(ImageModel model)
         {
             Model = model;

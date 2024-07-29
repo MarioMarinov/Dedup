@@ -1,9 +1,8 @@
-﻿using DedupWinUI.Converters;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Services;
 using Services.Models;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Drawing;
@@ -11,9 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media.Imaging;
 
 namespace DedupWinUI.ViewModels
 {
@@ -77,11 +74,21 @@ namespace DedupWinUI.ViewModels
                     _selectedModel = value;
                     RaisePropertyChanged(nameof(SelectedModel));
                     SelectedViewModel = (_selectedModel == null) ? null : new ImageViewModel(_selectedModel);
-                    SelectedViewModel.Thumbnail = _imgService.ResizeAndGrayout(SelectedViewModel.FullName, _settings.ThumbnailSize);
+
+                    //var thBmp = new Bitmap(SelectedViewModel.Model.ThumbnailSource);
+                    //GetImageSourceAsync(thBmp);
                 }
             }
         }
-
+        private async void GetImageSourceAsync(Bitmap thBitmap)
+        {
+            var sBmp = await _imgService.BmpToSBmp(thBitmap);
+            var src = new SoftwareBitmapSource();
+            await src.SetBitmapAsync(sBmp);
+            
+            SelectedViewModel.Thumbnail = src;
+            
+        }
         /// <summary>
         /// Binds to the viewbox
         /// </summary>
@@ -168,7 +175,7 @@ namespace DedupWinUI.ViewModels
                     {
                         await Task.Run(() => File.Delete(sourceFileName));
                     }
-                    _dataService.SaveImageData(Images, Path.Combine(_settings.ThumbnailDbDir, "thumbs.db"));
+                    _dataService.SaveImageDataAsync(Images, Path.Combine(_settings.ThumbnailDbDir, "thumbs.db"));
                     StatusText=$"{Images.Count} images";
                 }
                 return deleted;
@@ -183,17 +190,14 @@ namespace DedupWinUI.ViewModels
         {
             try
             {
-                var thumbnails = await _appService.GetCachedModelsAsync();
-                Images = new ObservableCollection<ImageModel>(
-                    thumbnails.OrderBy(o=>o.FilePath).ThenBy(o=>o.FileName)
-                    );
+                var models = await _appService.GetCachedModelsAsync();
+                Images = new ObservableCollection<ImageModel>(models);
             }
             catch (Exception ex)
             {
                 var s = ex.Message;
                 throw;
             }
-            
         }
 
         private void GetSimilarImages(string path)
@@ -223,9 +227,8 @@ namespace DedupWinUI.ViewModels
                     StatusText = $"Reading group {i + 1}/{partitionCount} | {rangeStart}-{rangeStart+count}/{imgCount}";
                     var imagesList = await _appService.ScanSourceFolderAsync(chunk);
                     foreach (var image in imagesList) { Images.Add(image); }
-                    _dataService.SaveImageData(Images, Path.Combine(_settings.ThumbnailDbDir, "thumbs.db"));
-                    RaisePropertyChanged(nameof(Images));
                 }
+                _dataService.SaveImageDataAsync(Images, Path.Combine(_settings.ThumbnailDbDir, "thumbs.db"));
                 StatusText = $"{imgCount} images";
             }
             catch (Exception ex)

@@ -6,8 +6,9 @@ namespace Services
 {
     public class DataService : IDataService
     {
-        public List<ImageModel> GetImageData(string dataFileName)
+        public async Task<List<ImageModel>> GetImageDataAsync(string dataFileName)
         {
+            await Task.Yield();
             var res = new List<ImageModel>();
             if (File.Exists(dataFileName))
             {
@@ -19,12 +20,13 @@ namespace Services
             return res;
         }
 
-        public void SaveImageData(IEnumerable<ImageModel> imageData, string dataFileName)
+        public async Task SaveImageDataAsync(IEnumerable<ImageModel> imageData, string dataFileName)
         {
+            await Task.Yield();
             if (File.Exists(dataFileName)) 
             { 
                 var backupFileName = Path.Combine(Path.GetDirectoryName(dataFileName),"thumbs.txt");
-                File.Copy(dataFileName, backupFileName, true);
+                File.Move(dataFileName, backupFileName, true);
             }
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(imageData, options);

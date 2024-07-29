@@ -165,11 +165,11 @@
                     <Image Grid.Column="1" Grid.Row="5"  Margin="0,5"
                            VerticalAlignment="Top" HorizontalAlignment="Left" Stretch="Uniform"
                            Width="{x:Bind ViewModel.HashImageSize}" Height="{x:Bind ViewModel.HashImageSize}"
-                           Source="{x:Bind ViewModel.SelectedViewModel.Model.ThumbnailSource, Mode=OneWay}" />
+                           Source="{x:Bind ViewModel.SelectedViewModel.Model.ImageHashSource, Mode=OneWay}" />
                     <Image Grid.Column="1" Grid.Row="6" Margin="0,5"
                            VerticalAlignment="Top" HorizontalAlignment="Left" Stretch="Uniform" 
                            Width="{x:Bind ViewModel.ThumbnailSize}" Height="{x:Bind ViewModel.ThumbnailSize}"
-                           Source="{x:Bind ViewModel.SelectedViewModel.Thumbnail, Mode=OneWay}">
+                           Source="{x:Bind ViewModel.SelectedViewModel.Model.ThumbnailSource, Mode=OneWay}">
 
                     </Image>
                 </Grid>

@@ -1,13 +1,12 @@
 ﻿
 using Microsoft.Extensions.Options;
 using Services.Models;
+using Shipwreck.Phash;
+using Shipwreck.Phash.Bitmaps;
 using System.Collections.Concurrent;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.IO;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Windows.Graphics.Imaging;
 
 
 namespace Services
@@ -23,39 +22,42 @@ namespace Services
             _fileService = fileService;
         }
 
-        public async Task<Image> CreateThumbnailAsync(string fileName, int maxSide)
+        public async Task<SoftwareBitmap> BmpToSBmp(Bitmap bmp)
         {
-            try
+            await Task.Yield();
+            SoftwareBitmap sBmp;
+            var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height),
+                ImageLockMode.ReadOnly,
+                PixelFormat.Format8bppIndexed);
+            var length = bmpData.Stride * bmpData.Height;
+            var bytes = new byte[length];
+            System.Runtime.InteropServices.Marshal.Copy(bmpData.Scan0, bytes, 0, length);
+            sBmp = new SoftwareBitmap(BitmapPixelFormat.Bgra8, bmp.Width, bmp.Height);
+            if (sBmp.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
+                sBmp.BitmapAlphaMode == BitmapAlphaMode.Straight)
             {
-                using (var originalImage = Image.FromFile(fileName))
-                {
-                    var thumbnailSize = GetThumbnailSize(originalImage, maxSide);
-                    var resizedImage = new Bitmap(thumbnailSize.Width, thumbnailSize.Height);
-
-                    using (var graphics = Graphics.FromImage(resizedImage))
-                    {
-                        graphics.CompositingQuality = CompositingQuality.HighQuality;
-                        graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                        graphics.SmoothingMode = SmoothingMode.HighQuality;
-                        await Task.Run(() => graphics.DrawImage(originalImage, 0, 0, thumbnailSize.Width, thumbnailSize.Height));
-                    }
-                    return resizedImage;
-                }
+                sBmp = SoftwareBitmap.Convert(sBmp, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
             }
-            catch { }
-            return default(Bitmap);
+            
+            return sBmp;
+        }
+
+        private Bitmap ResizeBitmap(string fileName, int maxSide)
+        {
+            var bmp = new Bitmap(fileName);
+            var thSize = GetTransformation(bmp.Width, bmp.Height, maxSide);
+            var th = new Bitmap(bmp, thSize.Width, thSize.Height);
+            return th;
         }
         
-        static Size GetThumbnailSize(Image image, int maxSide)
+        static (int Width, int Height, double Scale) GetTransformation(int originalWidth, int originalHeight, int thumbnailSide)
         {
-            var originalWidth = image.Width;
-            var originalHeight = image.Height;
-
-            var factor = (double)maxSide / Math.Max(originalWidth, originalHeight);
-            return new Size((int)(originalWidth * factor), (int)(originalHeight * factor));
+            var scale = (double)thumbnailSide / Math.Max(originalWidth, originalHeight);
+            var size = new Size((int)(originalWidth * scale), (int)(originalHeight * scale));
+            return (size.Width, size.Height, scale);
         }
 
-        public async Task<List<ImageModel>> GetImageModelsAsync(IEnumerable<string> fileNames)
+        public async Task<List<ImageModel>> GenerateImageModelsAsync(IEnumerable<string> fileNames)
         {
             var res = new ConcurrentBag<ImageModel>();
             var failed = new ConcurrentBag<string>();
@@ -65,9 +67,12 @@ namespace Services
             };
             await Parallel.ForEachAsync(fileNames, parallelOptions, async (fname, token) =>
             {
-                var imageModel = await HandleFile(fname, token);
+                var imageModel = await GenerateImageModelAsync(fname, token);
                 if (!string.IsNullOrEmpty(imageModel.ThumbnailSource))
+                {
+                    //var hash = GetImageHash(imageModel.ImageHashSource);
                     res.Add(imageModel);
+                }
                 else
                 {
                     failed.Add(fname);
@@ -80,7 +85,7 @@ namespace Services
         /// Traverse the thumbnails db path
         /// </summary>
         /// <param name="fileNames"></param>
-        /// <returns></returns>
+        /// <returns>List of ImageModel</returns>
         public async Task<List<ImageModel>> GetCachedModelsAsync(IEnumerable<string> fileNames)
         {
             var res = new ConcurrentBag<ImageModel>();
@@ -91,7 +96,7 @@ namespace Services
             };
             await Parallel.ForEachAsync(fileNames, parallelOptions, async (fname, token) =>
             {
-                var imageModel = await HandleCachedModel(fname, token);
+                var imageModel = GetCachedModel(fname, token);
                 if (!string.IsNullOrEmpty(imageModel.ThumbnailSource))
                     res.Add(imageModel);
                 else
@@ -102,76 +107,79 @@ namespace Services
             return res.OrderBy(f => f.FilePath).ThenBy(f => f.FileName).ToList();
         }
 
-        public async Task<ImageModel> HandleCachedModel(string filePath, CancellationToken token)
+        private ImageModel GetCachedModel(string filePath, CancellationToken token)
         {
             var sourcePath = _fileService.ConvertThumbnailPathToSourcePath(filePath);
             var model = new ImageModel(sourcePath);
             model.ThumbnailSource = filePath;
-            return await Task.FromResult(model);
+            var fn = Path.GetFileName(model.ThumbnailSource);
+            var ihn = _settings.HashImagePrefix + fn;
+            model.ImageHashSource = filePath.Replace(fn, ihn);
+            return model;
         }
 
-        public async Task<ImageModel> HandleFile(string filePath, CancellationToken token)
+        private async Task<ImageModel> GenerateImageModelAsync(string filePath, CancellationToken token)
         {
+            await Task.Yield();
             var model = new ImageModel(filePath);
-            var th = await CreateThumbnailAsync(filePath, _settings.ThumbnailSize);
+            var th = ResizeBitmap(filePath, _settings.ThumbnailSize);
             if (th != null)
             {
                 var thSrc = await _fileService.InsertThumbnailToDbAsync(th, filePath);
                 model.ThumbnailSource = thSrc;
             }
-            return await Task.FromResult(model);
+            var ih = ResizeBitmap(model.ThumbnailSource, _settings.HashImageSize);
+            if (ih != null)
+            {
+                ih = MakeGrayscale(ih);
+                var fn = Path.GetFileName(model.ThumbnailSource);
+                var ihn = _settings.HashImagePrefix + fn;
+                filePath = filePath.Replace(fn, ihn);
+                var ihSrc = await _fileService.InsertThumbnailToDbAsync(ih, filePath);
+                model.ImageHashSource = ihSrc;
+            }
+            return model;
         }
 
-        public void GetImageHash(string filePath)
+        private Digest GetImageDigest(string filePath)
         {
-            var img = Image.FromFile(filePath);
-            var width = img.Width;
-            var height = img.Height;
-            
+            var img = (Bitmap)Image.FromFile(filePath);
+            var hash = ImagePhash.ComputeDigest(img.ToLuminanceImage());
+            return hash;
         }
 
-        private Image ToGrayScale(Image image)
+        public static Bitmap MakeGrayscale(Bitmap original)
         {
-            // Make the ColorMatrix.
-            ColorMatrix cm = new ColorMatrix(
-            [
-                new float[] {0.299f, 0.299f, 0.299f, 0, 0},
-                new float[] {0.587f, 0.587f, 0.587f, 0, 0},
-                new float[] {0.114f, 0.114f, 0.114f, 0, 0},
-                new float[] { 0, 0, 0, 1, 0},
-                new float[] { 0, 0, 0, 0, 1}
-            ]);
-            ImageAttributes attributes = new ImageAttributes();
-            attributes.SetColorMatrix(cm);
+            Bitmap newBitmap = new Bitmap(original.Width, original.Height);
 
-            // Draw the image onto the new bitmap while
-            // applying the new ColorMatrix.
-            Point[] points =
+            using (Graphics g = Graphics.FromImage(newBitmap))
             {
-                new Point(0, 0),
-                new Point(image.Width, 0),
-                new Point(0, image.Height),
-            };
-            Rectangle rect = new Rectangle(0, 0, image.Width, image.Height);
+                ColorMatrix colorMatrix = new ColorMatrix(new float[][]
+                {
+            new float[] { 0.3f, 0.3f, 0.3f, 0, 0 },
+            new float[] { 0.59f, 0.59f, 0.59f, 0, 0 },
+            new float[] { 0.11f, 0.11f, 0.11f, 0, 0 },
+            new float[] { 0, 0, 0, 1, 0 },
+            new float[] { 0, 0, 0, 0, 1 }
+                });
 
-            // Make the result bitmap.
-            Bitmap bm = new Bitmap(image.Width, image.Height);
-            using (Graphics gr = Graphics.FromImage(bm))
-            {
-                gr.DrawImage(image, points, rect,
-                    GraphicsUnit.Pixel, attributes);
+                using (ImageAttributes attributes = new ImageAttributes())
+                {
+                    attributes.SetColorMatrix(colorMatrix);
+                    g.DrawImage(original, new Rectangle(0, 0, original.Width, original.Height), 0, 0, original.Width, original.Height, GraphicsUnit.Pixel, attributes);
+                }
             }
 
-            // Return the result.
-            return bm;
+            return newBitmap;
         }
-
+        /*
         public BitmapImage ResizeAndGrayout(string fileName, int maxSide)
+
         {
-            ///// Create a BitmapImage and set it's DecodePixelWidth to 200. Use  /////
+            ///// Create a BitmapImage and set it's DecodePixelWidth to maxSide. Use  /////
             ///// this BitmapImage as a source for other BitmapSource objects.    /////
 
-            BitmapImage myBitmapImage = new BitmapImage();//new Uri(fileName)
+            BitmapImage myBitmapImage = new BitmapImage();
 
             // BitmapSource objects like BitmapImage can only have their properties
             // changed within a BeginInit/EndInit block.
@@ -228,7 +236,16 @@ namespace Services
             //    enc.Frames.Add(BitmapFrame.Create(newFormatedBitmapSource));
             //    enc.Save(fileStream);
             //}
-
+            //-
+            //System.Drawing.Bitmap bitmap;
+            //using (var memStream = new MemoryStream())
+            //{
+            //    enc.Frames.Add(BitmapFrame.Create(newFormatedBitmapSource));
+            //    enc.Save(memStream);
+            //    bitmap = new System.Drawing.Bitmap(memStream);
+            //    memStream.Close();
+            //}
+            //-
             //getting a bitmap
             //using (MemoryStream outStream = new MemoryStream())
             //{
@@ -238,8 +255,11 @@ namespace Services
             //    System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(outStream);
             //    return new Bitmap(bitmap);
             //}
+            //return bitmap;
+            //-
             return bitmapImage;
         }
+        */
     }
 
 }

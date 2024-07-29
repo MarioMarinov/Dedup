@@ -1,8 +1,6 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
 
 namespace Services
 {
@@ -47,7 +45,6 @@ namespace Services
             if (!Directory.Exists(_thumbDbDir))
             {
                 var di = Directory.CreateDirectory(_thumbDbDir);
-                //di.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
                 return true;
             }
             else
@@ -56,7 +53,7 @@ namespace Services
             }
         }
 
-        public async Task<bool> SaveImageFileAsync(Image image, string filePath)
+        private async Task<bool> SaveImageFileAsync(Bitmap image, string filePath)
         {
             try
             {
@@ -87,21 +84,20 @@ namespace Services
             return false;
         }
 
-
         /// <summary>
         /// Copy the thumbnail calculated for the image found at filePath to the thumbnails db
         /// </summary>
         /// <param name="image"></param>
         /// <param name="filePath"></param>
         /// <returns>The thubnmail file location in the thumbnails db</returns>
-        public async Task<string> InsertThumbnailToDbAsync(Image image, string filePath)
+        public async Task<string> InsertThumbnailToDbAsync(Bitmap image, string filePath)
         {
             var destFilePath = ConvertSourcePathToThumbnailPath(filePath);
             var destFolder = Path.GetDirectoryName(destFilePath);
             if (!Directory.Exists(destFolder))
                 Directory.CreateDirectory(destFolder);
             if (!File.Exists(destFilePath))
-                _ = await SaveImageFileAsync(image, destFilePath);
+                await SaveImageFileAsync(image, destFilePath);
             return destFilePath;
         }
 

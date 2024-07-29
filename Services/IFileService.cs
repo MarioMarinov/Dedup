@@ -1,7 +1,5 @@
-﻿using Services.Models;
-using System.Collections.Concurrent;
-using System.Drawing;
-using System.IO;
+﻿using System.Drawing;
+using Windows.Graphics.Imaging;
 
 namespace Services
 {
@@ -11,7 +9,7 @@ namespace Services
         string ConvertThumbnailPathToSourcePath(string filePath);
 
         public Task<List<string>> EnumerateFilteredFilesAsync(string dir, string[] extensions, SearchOption searchOption = SearchOption.TopDirectoryOnly);
-        public Task<string> InsertThumbnailToDbAsync(Image image, string fileName);
+        public Task<string> InsertThumbnailToDbAsync(Bitmap image, string filePath);
 
     }
 }

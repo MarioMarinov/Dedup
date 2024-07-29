@@ -1,19 +1,19 @@
-﻿using DedupWinUI.Converters;
+﻿using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Serilog;
 using Services;
 using Services.Models;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Drawing;
-using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media.Imaging;
 
 namespace DedupWinUI.ViewModels
 {
@@ -24,8 +24,22 @@ namespace DedupWinUI.ViewModels
         private IImagingService _imgService;
         private IDataService _dataService;
         private AppSettings _settings;
+        private readonly ILogger<MainViewModel> _logger;
+        private readonly IMessenger _messenger;
+
         public int HashImageSize { get; set; }
-        
+
+        private Visibility _detailsViewVisibility;
+        public Visibility DetailsViewVisibility 
+        { 
+            get { return _detailsViewVisibility; }
+            private set
+            {
+                _detailsViewVisibility = value;
+                RaisePropertyChanged(nameof(DetailsViewVisibility));
+            }
+        }
+
         private ObservableCollection<ImageModel> _images;
         public ObservableCollection<ImageModel> Images
         {
@@ -34,7 +48,7 @@ namespace DedupWinUI.ViewModels
             {
                 _images = value;
                 RaisePropertyChanged(nameof(Images));
-                StatusText = $"{_images.Count} images";
+                StatusText = $"{_images.Count} files found";
             }
         }
 
@@ -56,12 +70,15 @@ namespace DedupWinUI.ViewModels
         public ImageViewModel SelectedViewModel
         {
             get { return _selectedViewModel; }
-            set
+            private set
             {
                 if (_selectedViewModel != value)
                 {
                     _selectedViewModel = value;
                     RaisePropertyChanged(nameof(SelectedViewModel));
+                    DetailsViewVisibility = (_selectedViewModel == null) ?
+                        Visibility.Collapsed :
+                        Visibility.Visible;
                 }
             }
         }
@@ -77,11 +94,18 @@ namespace DedupWinUI.ViewModels
                     _selectedModel = value;
                     RaisePropertyChanged(nameof(SelectedModel));
                     SelectedViewModel = (_selectedModel == null) ? null : new ImageViewModel(_selectedModel);
-                    SelectedViewModel.Thumbnail = _imgService.ResizeAndGrayout(SelectedViewModel.FullName, _settings.ThumbnailSize);
                 }
             }
         }
-
+        private async void GetImageSourceAsync(Bitmap thBitmap)
+        {
+            var sBmp = await ImagingService.BmpToSBmp(thBitmap);
+            var src = new SoftwareBitmapSource();
+            await src.SetBitmapAsync(sBmp);
+            
+            SelectedViewModel.Thumbnail = src;
+            
+        }
         /// <summary>
         /// Binds to the viewbox
         /// </summary>
@@ -100,8 +124,8 @@ namespace DedupWinUI.ViewModels
         /// <summary>
         /// Binds to the scale slider
         /// </summary>
-        private Single _sourceImageScale;
-        public Single SourceImageScale
+        private float _sourceImageScale;
+        public float SourceImageScale
         {
             get { return _sourceImageScale; }
             set
@@ -129,71 +153,86 @@ namespace DedupWinUI.ViewModels
         }
 
         public int ThumbnailSize { get; set; }
-        
+
+        #region Commands
+        public ICommand DeleteFilesCommand { get; }
         public ICommand ScanFilesCommand { get; }
         public ICommand GetSimilarImagesCommand { get; }
         public ICommand RenameFileCommand { get; }
+        public ICommand ZoomInCommand { get; }
+        public ICommand ZoomOutCommand { get; }
+        
+        #endregion
 
-
-        public MainViewModel(IOptions<AppSettings> settings, IAppService appService, IDataService dataService, IImagingService imagingService)
+        public MainViewModel(
+            IOptions<AppSettings> settings, 
+            IAppService appService, 
+            IDataService dataService, 
+            IImagingService imagingService,
+            IMessenger messenger,
+            ILogger<MainViewModel> logger)
         {
             _settings = settings.Value;
             _appService = appService;
             _dataService = dataService;
             _imgService = imagingService;
+            _messenger = messenger;
+            _logger= logger;
             HashImageSize = _settings.HashImageSize;
             Recurse = false;
             SourcePath = settings.Value.SourcePath;
-            SourceImageScale = 80;
+            SourceImageScale = 100.0f;
             ThumbnailSize = _settings.ThumbnailSize;
+            Images = new ObservableCollection<ImageModel>();
+            DeleteFilesCommand = new CommandEventHandler<ImageModel>(async (model) => await DeleteFiles(model));
             GetSimilarImagesCommand = new CommandEventHandler<string>((path) => GetSimilarImages(path));
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
             ScanFilesCommand = new CommandEventHandler<string>(async path => await ScanFiles());
+            ZoomInCommand = new CommandEventHandler<object>((_) => ZoomInImage(_));
+            ZoomOutCommand = new CommandEventHandler<object>((_) => ZoomOutImage(_));
+            DetailsViewVisibility = Visibility.Collapsed;
         }
+
+        private async Task DeleteFiles(ImageModel model)
+        {
+            await DeleteModelAsync(model);
+        }
+
+
 
         public async Task<bool> DeleteModelAsync(ImageModel model)
         {
+            var deleted = false;
             try
             {
-                var deleted = Images.Remove(model);
+                Images.Remove(model);
+                deleted = await _appService.DeleteImageAsync(model);
                 if (deleted)
                 {
-                    var sourceFileName = Path.Combine(model.FilePath, model.FileName);
-                    var thumbFileName = model.ThumbnailSource;
-                    if (File.Exists(thumbFileName))
-                    {
-                        await Task.Run(()=>File.Delete(thumbFileName));
-                    }
-                    if (File.Exists(sourceFileName))
-                    {
-                        await Task.Run(() => File.Delete(sourceFileName));
-                    }
-                    _dataService.SaveImageData(Images, Path.Combine(_settings.ThumbnailDbDir, "thumbs.db"));
-                    StatusText=$"{Images.Count} images";
+                    StatusText =$"{Images.Count} images";
                 }
                 return deleted;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Log.Error($"Unable to delete a model: {ex.Message}");
                 throw;
             }
         }
 
-        public async Task GetCachedModelsAsync()
+        public async Task GetModelsAsync()
         {
             try
             {
-                var thumbnails = await _appService.GetCachedModelsAsync();
-                Images = new ObservableCollection<ImageModel>(
-                    thumbnails.OrderBy(o=>o.FilePath).ThenBy(o=>o.FileName)
-                    );
+                var models = await _appService.GetModelsAsync();
+                _logger.LogInformation($"{models.Count} files loaded");
+                Images = new ObservableCollection<ImageModel>(models);
             }
             catch (Exception ex)
             {
                 var s = ex.Message;
                 throw;
             }
-            
         }
 
         private void GetSimilarImages(string path)
@@ -211,6 +250,7 @@ namespace DedupWinUI.ViewModels
         {
             try
             {
+                await _dataService.CreateTablesAsync();//TODO: To be deleted
                 var fileNames = await _appService.GetSourceFolderFilesAsync(Recurse);
                 var imgCount = fileNames.Count;
                 int partitionSize = 100;
@@ -222,10 +262,10 @@ namespace DedupWinUI.ViewModels
                     var chunk = fileNames.GetRange(rangeStart, count);
                     StatusText = $"Reading group {i + 1}/{partitionCount} | {rangeStart}-{rangeStart+count}/{imgCount}";
                     var imagesList = await _appService.ScanSourceFolderAsync(chunk);
+                    await _dataService.InsertImageDataAsync(imagesList);
                     foreach (var image in imagesList) { Images.Add(image); }
-                    _dataService.SaveImageData(Images, Path.Combine(_settings.ThumbnailDbDir, "thumbs.db"));
-                    RaisePropertyChanged(nameof(Images));
                 }
+                //await _dataService.InsertImageDataAsync(Images.ToList());
                 StatusText = $"{imgCount} images";
             }
             catch (Exception ex)
@@ -243,6 +283,21 @@ namespace DedupWinUI.ViewModels
             select new GroupedImagesList(g) { Key = g.Key };
 
             return new ObservableCollection<GroupedImagesList>(query);
+        }
+
+        private void ZoomInImage(object obj)
+        {
+            if (SourceImageScale < 200)
+            {
+                SourceImageScale += 10;
+            }
+        }
+        private void ZoomOutImage(object obj)
+        {
+            if (SourceImageScale > 10)
+            {
+                SourceImageScale -= 10;
+            }
         }
 
     }

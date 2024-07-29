@@ -1,21 +1,23 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics;
+﻿using Microsoft.Extensions.Options;
+using Microsoft.Web.WebView2.Core;
+using Shipwreck.Phash;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
 
 namespace Services
 {
     public class FileService : IFileService
     {
-        private string _sourceDir;
-        private string _thumbDbDir;
 
-        public FileService(string sourceDir, string thumbDbDir)
+        readonly AppSettings _settings;
+
+        public FileService(IOptions<AppSettings> settings)
         {
-            _sourceDir = sourceDir;
-            _thumbDbDir = thumbDbDir;
+            _settings = settings.Value;
+        
             CreateThumbnailDbRoot();
+            CreateRecycleBinRoot();
         }
 
         public async Task<List<string>> EnumerateFilteredFilesAsync(string dir, string[] extensions, SearchOption searchOption = SearchOption.TopDirectoryOnly)
@@ -42,21 +44,23 @@ namespace Services
             return allFiles.ToList();
         }
 
-        private bool CreateThumbnailDbRoot()
+        private void CreateThumbnailDbRoot()
         {
-            if (!Directory.Exists(_thumbDbDir))
+            if (!Directory.Exists(_settings.ThumbnailsPath))
             {
-                var di = Directory.CreateDirectory(_thumbDbDir);
-                //di.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
-                return true;
-            }
-            else
-            {
-                return false;
+                var di = Directory.CreateDirectory(_settings.ThumbnailsPath);
             }
         }
 
-        public async Task<bool> SaveImageFileAsync(Image image, string filePath)
+        private void CreateRecycleBinRoot()
+        {
+            if (!Directory.Exists(_settings.RecycleBinPath))
+            {
+                Directory.CreateDirectory(_settings.RecycleBinPath);
+            }
+        }
+
+        public async Task<bool> SaveImageAsync(Bitmap image, string filePath)
         {
             try
             {
@@ -86,37 +90,90 @@ namespace Services
             }
             return false;
         }
-
-
+        /*
         /// <summary>
-        /// Copy the thumbnail calculated for the image found at filePath to the thumbnails db
+        /// Save the image thumbnail into thumbnails folder
         /// </summary>
         /// <param name="image"></param>
         /// <param name="filePath"></param>
         /// <returns>The thubnmail file location in the thumbnails db</returns>
-        public async Task<string> InsertThumbnailToDbAsync(Image image, string filePath)
+        public async Task<string> SaveThumbnailImageAsync(Bitmap image, string filePath)
         {
             var destFilePath = ConvertSourcePathToThumbnailPath(filePath);
             var destFolder = Path.GetDirectoryName(destFilePath);
             if (!Directory.Exists(destFolder))
                 Directory.CreateDirectory(destFolder);
             if (!File.Exists(destFilePath))
-                _ = await SaveImageFileAsync(image, destFilePath);
+                await SaveImageFileAsync(image, destFilePath);
             return destFilePath;
         }
+        */
 
         public string ConvertSourcePathToThumbnailPath(string fullFilePath)
         {
-            var relPath = fullFilePath.Substring(_sourceDir.Length);
-            var destPath = Path.Combine(_thumbDbDir, relPath);
+            var relPath = fullFilePath.Substring(_settings.SourcePath.Length);
+            var destPath = Path.Combine(_settings.ThumbnailsPath, relPath);
             return destPath;
         }
 
         public string ConvertThumbnailPathToSourcePath(string fullThumbnailPath)
         {
-            var relPath = fullThumbnailPath.Substring(_thumbDbDir.Length);
-            var sourcePath = Path.Combine(_sourceDir, relPath);
+            var relPath = fullThumbnailPath.Substring(_settings.ThumbnailsPath.Length);
+            var sourcePath = Path.Combine(_settings.SourcePath, relPath);
             return sourcePath;
+        }
+
+        public string GetRelPath(string fullFilePath)
+        {
+            var relPath = GetRelPath(_settings.SourcePath, fullFilePath);
+            return relPath;
+        }
+
+        public string GetRelPath(string rootPath, string fullFilePath)
+        {
+            var relPath = Path.GetRelativePath(rootPath, fullFilePath);
+            return (relPath == ".") ? string.Empty : relPath;
+        }
+
+        public static void DeleteFile(string imagePath)
+        {
+            bool fileDeleted = false;
+            int attempts = 0;
+            while (!fileDeleted && attempts < 5)
+            {
+                try
+                {
+                    File.Delete(imagePath);
+                    fileDeleted = true;
+                }
+                catch (IOException)
+                {
+                    attempts++;
+                    Thread.Sleep(100); // Wait for 100 milliseconds before retrying
+                    if (attempts == 5) throw;
+                }
+            }
+        }
+
+        public static void MoveFile(string sourcePath, string destinationPath)
+        {
+            bool fileDeleted = false;
+            int attempts = 0;
+            while (!fileDeleted && attempts < 5)
+            {
+                try
+                {
+                    File.Move(sourcePath, destinationPath);
+                    fileDeleted = true;
+                }
+                catch (IOException)
+                {
+                    attempts++;
+                    Thread.Sleep(100); // Wait for 100 milliseconds before retrying
+                    if (attempts == 5) throw;
+                }
+            }
+
         }
     }
 }

@@ -1,7 +1,11 @@
 ﻿using Microsoft.Extensions.Options;
+using Serilog;
 using Services.Models;
-using System.Collections.ObjectModel;
-using System.IO;
+using Shipwreck.Phash;
+using Shipwreck.Phash.Bitmaps;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Drawing;
 
 namespace Services
 {
@@ -23,6 +27,30 @@ namespace Services
             _imagingService = imagingService;
             _dataService = iDataService;
         }
+        public async Task<bool> DeleteImageAsync(ImageModel model)
+        {
+            var res = false;
+            var destPath = Path.Combine(_settings.RecycleBinPath,model.RelativePath);
+            if (!Directory.Exists(destPath)) Directory.CreateDirectory(destPath);
+            var destFilePath = Path.Combine(destPath, model.FileName);
+            try
+            {
+                //Try to move to recycle bin first, failure to move effectively cancels the whole deletion
+                FileService.MoveFile(model.FilePath, destFilePath);
+                File.Delete(model.ThumbnailSource);
+                File.Delete(model.ImageHashSource);
+                var cnt = await _dataService.DeleteImageDataAsync([model]);
+                res = true;
+            }
+            catch (Exception)
+            {
+                Log.Error($"AppService failed to delete {model.FilePath}");
+                throw;
+                
+            }
+            
+            return res;
+        }
 
         public async Task<List<String>> GetSourceFolderFilesAsync(bool recurse)
         {
@@ -33,25 +61,187 @@ namespace Services
                    (recurse) ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
             return fileNames;
         }
+        public async Task<List<String>> GetRecycleBinFilesAsync()
+        {
+            var fileNames = await
+               _fileService.EnumerateFilteredFilesAsync(
+                   _settings.RecycleBinPath,
+                   _settings.Extensions,
+                   SearchOption.AllDirectories);
+            return fileNames;
+        }
+
+        public async Task<List<ImageModel>> GenerateImageModelsAsync(IEnumerable<string> fileNames)
+        {
+            var res = new ConcurrentBag<ImageModel>();
+            var failed = new ConcurrentBag<string>();
+            ParallelOptions parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount
+            };
+            await Parallel.ForEachAsync(fileNames, parallelOptions, async (fname, token) =>
+            {
+                var imageModel = await GenerateImageModelAsync(fname, token);
+                if (!string.IsNullOrEmpty(imageModel.ThumbnailSource))
+                {
+                    res.Add(imageModel);
+                }
+                else
+                {
+                    failed.Add(fname);
+                }
+            });
+            return res.OrderBy(f => f.RelativePath).ThenBy(f => f.FileName).ToList();
+        }
+
+        public async Task<List<ImageModel>> GetRecycleBinImageModelsAsync()
+        {
+            var res = new ConcurrentBag<ImageModel>();
+            var failed = new ConcurrentBag<string>();
+
+            var fileNames = await GetRecycleBinFilesAsync();
+           
+            foreach (var fname in fileNames) {
+                var imageModel = await GenerateRecycleBinImageModelAsync(fname, CancellationToken.None);
+                res.Add(imageModel);
+            }
+            
+            return res.OrderBy(f => f.RelativePath).ThenBy(f => f.FileName).ToList();
+
+        }
+        /// <summary>
+        /// Based on the file information and settings, generate the thumnail and hash image
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        private async Task<ImageModel> GenerateImageModelAsync(string filePath, CancellationToken token)
+        {
+            var fi = new FileInfo(filePath);
+            var fileName = fi.Name; 
+            var directoryName = fi.DirectoryName;
+            var relPath = _fileService.GetRelPath(directoryName);
+            var model = new ImageModel(fileName, relPath, fi.Length, null);
+            model.ThumbnailSource = Path.Combine(_settings.ThumbnailsPath, model.RelativePath,
+                $"{AppSettings.ThumbnailPrefix}{fileName}");
+            model.ImageHashSource = Path.Combine(_settings.ThumbnailsPath, model.RelativePath,
+                $"{AppSettings.HashImagePrefix}{fileName}");
+            model.FilePath = Path.Combine(_settings.SourcePath, model.RelativePath, fileName);
+            //Create the destination folder
+            Directory.CreateDirectory(Path.Combine(_settings.ThumbnailsPath, model.RelativePath));
+
+            if (!File.Exists(model.ThumbnailSource))
+            {
+                //Compute the thumbnail to save
+                var th = await ImagingService.ResizeBitmapAsync(filePath, _settings.ThumbnailSize);
+                if (th != null)
+                {
+                    var opRes = await _fileService.SaveImageAsync(th, model.ThumbnailSource);
+                    if (!opRes)
+                    {
+                        //TODO: Handle!
+                        //throw new Exception("Cannot save the thumbnail image");
+                    }
+
+                    if (!File.Exists(model.ImageHashSource))
+                    {
+                        //Compute the hash image and save
+                        var ih = await ImagingService.ResizeBitmapAsync(th, _settings.HashImageSize);
+                        if (ih != null)
+                        {
+                            ih = ImagingService.MakeGrayscale(ih);
+                            opRes = await _fileService.SaveImageAsync(ih, model.ImageHashSource);
+                            if (!opRes)
+                            {
+                                //TODO: Handle!
+                                //throw new Exception("Cannot save the hash image");
+                            }
+                        }
+                    }
+                }
+            }
+            return model;
+        }
+        
+        /// <summary>
+        /// Create a recycle bin item
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        private async Task<ImageModel> GenerateRecycleBinImageModelAsync(string filePath, CancellationToken token)
+        {
+            await Task.Yield();
+            var fi = new FileInfo(filePath);
+            var fileName = fi.Name;
+            var directoryName = fi.DirectoryName;
+            var relPath = _fileService.GetRelPath(_settings.RecycleBinPath, directoryName ?? string.Empty);
+            var model = new ImageModel(fileName, relPath, fi.Length, null);
+            model.FilePath = filePath;
+            return model;
+        }
 
         /// <summary>
-        /// Scan the media source folder
+        /// Creates a list of ImageModel
         /// </summary>
-        /// <param name="recurse">Set to true to traverse the folder hierarchy</param>
+        /// <param name="fileNames">List of filenames</param>
         /// <returns>A list of ImageModel instances</returns>
         public async Task<List<ImageModel>> ScanSourceFolderAsync(List<string> fileNames)
         {
-            var models = await _imagingService.GetImageModelsAsync(fileNames);
-            _dataService.SaveImageData(models, Path.Combine(_settings.ThumbnailDbDir,"thumbs.db"));
+            var models = await GenerateImageModelsAsync(fileNames);
             return models;
         }
 
-        public async Task<List<ImageModel>> GetCachedModelsAsync()
+        public async Task<List<ImageModel>> GetModelsAsync()
         {
-            var models = _dataService.GetImageData(Path.Combine(_settings.ThumbnailDbDir, "thumbs.db"));
-            return models;
+            var models = await _dataService.SelectImageDataAsync();
+            Parallel.ForEach(models, model =>
+            {
+                model.ThumbnailSource = Path.Combine(_settings.ThumbnailsPath, model.RelativePath,
+                $"{AppSettings.ThumbnailPrefix}{model.FileName}");
+                model.ImageHashSource = Path.Combine(_settings.ThumbnailsPath, model.RelativePath,
+                $"{AppSettings.HashImagePrefix}{model.FileName}");
+                model.FilePath = Path.Combine(_settings.SourcePath, model.RelativePath, model.FileName);
+                if (!File.Exists(model.ThumbnailSource) || !File.Exists(model.ImageHashSource))
+                {
+                    Console.WriteLine($"Target images not found for {model.FileName}");
+                }
+            });
+            return models.ToList();
         }
 
+        public static 
+            (ConcurrentDictionary<string, Digest> filePathsToHashes, ConcurrentDictionary<Digest, HashSet<string>> hashesToFiles) 
+            GetHashes(List<string> files)
+        {
+            var filePathsToHashes = new ConcurrentDictionary<string, Digest>();
+            var hashesToFiles = new ConcurrentDictionary<Digest, HashSet<string>>();
+
+            Parallel.ForEach(files, (currentFile) =>
+            {
+                var bitmap = (Bitmap)Image.FromFile(currentFile);
+                var hash = ImagePhash.ComputeDigest(bitmap.ToLuminanceImage());
+                filePathsToHashes[currentFile] = hash;
+
+                HashSet<string> currentFilesForHash;
+
+                lock (hashesToFiles)
+                {
+                    if (!hashesToFiles.TryGetValue(hash, out currentFilesForHash))
+                    {
+                        currentFilesForHash = new HashSet<string>();
+                        hashesToFiles[hash] = currentFilesForHash;
+                    }
+                }
+
+                lock (currentFilesForHash)
+                {
+                    currentFilesForHash.Add(currentFile);
+                }
+            });
+
+            return (filePathsToHashes, hashesToFiles);
+        }
 
     }
 }

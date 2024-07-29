@@ -1,15 +1,13 @@
 ﻿using Services.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Services
 {
     public interface IDataService
     {
-        List<ImageModel> GetImageData(string dataFileName);
-        void SaveImageData(IEnumerable<ImageModel> imageData, string dataFileName);
+        Task CreateTablesAsync();
+        Task<List<ImageModel>> SelectImageDataAsync();
+        Task InitTablesAsync(string[] tableNames);
+        Task InsertImageDataAsync(List<ImageModel> imageData);
+        Task<int> DeleteImageDataAsync(List<ImageModel> imageData);
     }
 }

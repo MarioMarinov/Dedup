@@ -1,12 +1,11 @@
-﻿using System;
-using System.Globalization;
-using System.Windows.Data;
+﻿using Microsoft.UI.Xaml.Data;
+using System;
 
 namespace DedupWinUI.Converters
 {
     public class FileSizeConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object Convert(object value, Type targetType, object parameter, string culture)
         {
             var length = (long)value;
             if (length <= 0) { return string.Format($"{length} bytes"); }
@@ -16,7 +15,8 @@ namespace DedupWinUI.Converters
             return string.Empty;
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+       
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
         {
             throw new NotImplementedException();
         }

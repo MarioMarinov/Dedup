@@ -1,0 +1,35 @@
+{
+  "AppSettings": {
+    "SourcePath": "IMAGE_REPO_FOLDER",
+    "ThumbnailDbDir": "TEMP_FOLDER",
+    "Extensions": [ ".bmp", ".BMP", ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG" ],
+    "ThumbnailPrefix": "th_",
+    "ThumbnailSize": 100,
+    "HashImagePrefix": "ih_",
+    "HashImageSize": 30
+  },
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.File", "Serilog.Sinks.Trace" ],
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "log.txt",
+          "rollingInterval": "Day"
+        }
+      },
+      { "Name": "Trace" }
+    ],
+    "Enrich": [ "FromLogContext", "WithMachineName", "WithThreadId" ],
+    "Properties": {
+      "Application": "DedupWinUi"
+    }
+  }
+}

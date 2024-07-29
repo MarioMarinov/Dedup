@@ -1,29 +1,45 @@
-﻿using System.IO;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Services.Models
 {
     public record ImageModel
     {
+        /// <summary>
+        /// Source Image file name
+        /// </summary>
         public string FileName { get; private set; }
-        public string? FilePath { get; private set; }
+        
+        /// <summary>
+        /// Source Image full path
+        /// </summary>
+        [JsonIgnore]
+        public string FilePath { get; set; }
+        
+        /// <summary>
+        /// Hash image full path
+        /// </summary>
+        [JsonIgnore]
+        public string ImageHashSource { get; set; }
+        public string? ImageHash { get; set; }
         public long Length { get; private set; }
-        public string? ThumbnailSource { get; set; }
-        public ImageModel(string fullName)
-        {
-            var fi = new FileInfo(fullName);
-            Length = fi.Length;
-            FileName = fi.Name;
-            FilePath = fi.DirectoryName;
-        }
+        
+        /// <summary>
+        /// Thumbnail full path
+        /// </summary>
+        [JsonIgnore]
+        public string ThumbnailSource { get; set; }
+        
+        /// <summary>
+        /// Image's relative path from source folder
+        /// </summary>
+        public string RelativePath { get; private set; }
 
-        [JsonConstructor]
-        public ImageModel(string fileName, string? filePath, long length, string thumbnailSource)
+        public ImageModel(string fileName, string relativePath, long length, string? imageHash)
         {
             FileName = fileName;
-            FilePath = filePath;
+            RelativePath = relativePath;
             Length = length;
-            ThumbnailSource = thumbnailSource;
+            ImageHash = imageHash;
         }
     }
 

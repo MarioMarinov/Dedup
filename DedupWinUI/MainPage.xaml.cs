@@ -9,18 +9,15 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Windows.UI.Popups;
-using System.IO;
-using System.Windows.Input;
 using Windows.System;
 using System.Linq;
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using Serilog;
+using Services.Models;
+using System.Collections.Generic;
+
 
 namespace DedupWinUI
 {
-    /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
-    /// </summary>
     public sealed partial class MainPage : Page
     {
         public MainViewModel ViewModel { get; }
@@ -35,7 +32,7 @@ namespace DedupWinUI
 
         private async Task InitializeAsync()
         {
-            await ViewModel.GetCachedModelsAsync();
+            await ViewModel.GetModelsAsync();
         }
 
         private void GridViewItem_Tapped(object sender, TappedRoutedEventArgs e)
@@ -49,39 +46,50 @@ namespace DedupWinUI
 
         private async void DeleteSourceButton_ClickAsync(object sender, RoutedEventArgs e)
         {
-            if (ViewModel.SelectedModel == null) return;
-            ContentDialog deleteFileDialog = new ContentDialog
-            {
-                Title = "Delete file permanently?",
-                Content = $"If you delete {ViewModel.SelectedViewModel.FileName}, you won't be able to recover it. Do you want to delete it?",
-                PrimaryButtonText = "Delete",
-                CloseButtonText = "Cancel"
-            };
-            deleteFileDialog.XamlRoot = Content.XamlRoot;
-            ContentDialogResult result = await deleteFileDialog.ShowAsync();
-
-            if (result == ContentDialogResult.Primary)
-            {
-                var sel = ViewModel.SelectedModel;
-
-                var deleted = false;
-                try
-                {
-                    deleted = await ViewModel.DeleteModelAsync(sel);
-                }
-                catch { }
-                if (!deleted)
-                {
-                    var msg = new MessageDialog("The file couldn't be deleted");
-                }
-            }
-            else
-            {
-                // The user clicked the CloseButton, pressed ESC, Gamepad B, or the system back button.
-                // Do nothing.
+            if (ItemsGridView.SelectedItems.Count > 0) {
+                var models = ItemsGridView.SelectedItems.Cast<ImageModel>().ToList();
+                DeleteSelectedItems(models);
             }
         }
 
+        private void ItemsGridView_KeyUp(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.Delete && ViewModel.SelectedModel != null)
+            {
+                var index = ViewModel.Images.IndexOf(ViewModel.SelectedModel);
+                var model = ViewModel.SelectedModel;
+                ViewModel.DeleteFilesCommand.Execute(model);
+                //DeleteSelectedItems([model]);
+
+                if (index < ViewModel.Images.Count)
+                {
+                    ViewModel.SelectedModel = ViewModel.Images[index];
+                }
+                else
+                {
+                    ViewModel.SelectedModel = ViewModel.Images.Last();
+                }
+                e.Handled = true;
+            }
+        }
+
+        private void DeleteSelectedItems(List<ImageModel> models)
+        {
+            SelectedImage.Source = null;
+            SimilarImage.Source = null;
+            foreach (var model in models)
+            {
+                try
+                {
+                    ViewModel.DeleteModelAsync(model);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, $"Couldn't delete {model.FileName}");
+                    //throw;
+                }
+            }
+        }
         private void RenameSourceButton_Click(object sender, RoutedEventArgs e)
         {
 
@@ -160,22 +168,15 @@ namespace DedupWinUI
             return softwareBitmapSource;
         }
 
-        private void ItemsGridView_KeyUp(object sender, KeyRoutedEventArgs e)
+        
+
+        private void NavigationButton_Click(object sender, RoutedEventArgs e)
         {
-            if (e.Key == VirtualKey.Delete && ViewModel.SelectedModel!=null)
-            {
-                var index = ViewModel.Images.IndexOf(ViewModel.SelectedModel);
-                ViewModel.DeleteModelAsync(ViewModel.SelectedModel);
-                if (index < ViewModel.Images.Count)
-                {
-                    ViewModel.SelectedModel = ViewModel.Images[index];
-                }
-                else
-                {
-                    ViewModel.SelectedModel = ViewModel.Images.Last();
-                }
-                e.Handled = true;
-            }
+            var src = (AppBarButton)e.OriginalSource;
+            var pageName = src.CommandParameter.ToString();
+            var typeName = $"DedupWinUI.{pageName}, DedupWinUI";
+            var type = Type.GetType(typeName);
+            Frame.Navigate(type);
         }
     }
 }

@@ -1,7 +1,7 @@
 {
   "AppSettings": {
-    "SourcePath": "\\\\Rusi\\Media2\\Photos\\",
-    "ThumbnailDbDir": "D:\\Temp\\Dedup\\thumbnails\\",
+    "SourcePath": "YOUR_IMAGE_REPOSITORY_FOLDER",
+    "ThumbnailDbDir": "YOUR_TEMP_FOLDER",
     "Extensions": [ ".bmp", ".BMP", ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG" ],
     "ThumbnailPrefix": "th_",
     "ThumbnailSize": 100,

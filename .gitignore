@@ -396,3 +396,10 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+/BlankApp/BlankApp.csproj
+/BlankLib/BlankLib.csproj
+/DedupConsole/DedupConsole.csproj
+/BlankApp/BlankApp.csproj
+/BlankLib/BlankLib.csproj
+/DedupConsole/DedupConsole.csproj
+/DedupWinUI/appsettings.json

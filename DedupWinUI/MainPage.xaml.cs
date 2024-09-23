@@ -35,15 +35,6 @@ namespace DedupWinUI
             await ViewModel.GetModelsAsync();
         }
 
-        private void GridViewItem_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            var item = (GridViewItem)sender;
-            if (item != null)
-            {
-                //ViewModel.SelectedItem = item.DataContext as FileInfoViewModel;
-            }
-        }
-
         private async void DeleteSourceButton_ClickAsync(object sender, RoutedEventArgs e)
         {
             if (ItemsGridView.SelectedItems.Count > 0) {
@@ -90,44 +81,9 @@ namespace DedupWinUI
                 }
             }
         }
-        private void RenameSourceButton_Click(object sender, RoutedEventArgs e)
-        {
+        
 
-        }
-
-        private void FindSimilarToSourceButton_Click(object sender, RoutedEventArgs e)
-        {
-
-        }
-
-        //private void ItemsGridView_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
-        //{
-        //    if (args.InRecycleQueue)
-        //    {
-        //        var templateRoot = args.ItemContainer.ContentTemplateRoot as Grid;
-        //        var image = templateRoot.FindName("ItemImage") as Image;
-        //        image.Source = null;
-        //    }
-
-        //    if (args.Phase == 0)
-        //    {
-        //        args.RegisterUpdateCallback(ShowImage);
-        //        args.Handled = true;
-        //    }
-        //}
-        //private ImagingService imgsvc = new ImagingService();
-
-        //private async void ShowImage(ListViewBase sender, ContainerContentChangingEventArgs args)
-        //{
-        //    if (args.Phase == 1)
-        //    {
-        //        // It's phase 1, so show this item's image.
-        //        var templateRoot = args.ItemContainer.ContentTemplateRoot as Grid;
-        //        var image = templateRoot.FindName("ItemImage") as Image;
-        //        var item = args.Item as ImageModel;
-        //        image.Source = await imgsvc.GetImageThumbnailAsync();
-        //    }
-
+        
         //Converters
         public string GetLengthText(long length)
         {
@@ -177,6 +133,29 @@ namespace DedupWinUI
             var typeName = $"DedupWinUI.{pageName}, DedupWinUI";
             var type = Type.GetType(typeName);
             Frame.Navigate(type);
+        }
+
+        private void MenuFlyoutItem_ScanSimilar_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuFlyoutItem menuItem)
+            {
+                SelectedText.Text = menuItem.Text;
+                if (menuItem.Icon is SymbolIcon symbolIcon)
+                {
+                    SelectedIcon.Content = new SymbolIcon { Symbol = symbolIcon.Symbol };
+                }
+            }
+        }
+
+        private void GetSimilarImages_Loaded(object sender, RoutedEventArgs e)
+        {
+            var defaultMenuItem = (MenuFlyoutItem)GetSimilarImagesFlyout.Items[0];
+            SelectedText.Text = defaultMenuItem.Text;
+
+            if (defaultMenuItem.Icon is SymbolIcon symbolIcon)
+            {
+                SelectedIcon.Content = new SymbolIcon { Symbol = symbolIcon.Symbol };
+            }
         }
     }
 }

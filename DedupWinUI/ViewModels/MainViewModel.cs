@@ -14,6 +14,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Windows.Storage.Search;
 
 namespace DedupWinUI.ViewModels
 {
@@ -51,6 +52,30 @@ namespace DedupWinUI.ViewModels
                 StatusText = $"{_images.Count} files found";
             }
         }
+
+        private ObservableCollection<ImageModel> _similarImages;
+        public ObservableCollection<ImageModel> SimilarImages
+        {
+            get { return _similarImages; }
+            set
+            {
+                _similarImages = value;
+                RaisePropertyChanged(nameof(SimilarImages));
+            }
+        }
+
+        private string _lastSimilarScanOption;
+
+        public string LastSimilarScanOption
+        {
+            get { return _lastSimilarScanOption; }
+            set 
+            { 
+                _lastSimilarScanOption = value; 
+                RaisePropertyChanged(nameof(LastSimilarScanOption));
+            }
+        }
+
 
         public string SourcePath { get; set; }
 
@@ -168,14 +193,12 @@ namespace DedupWinUI.ViewModels
             IOptions<AppSettings> settings, 
             IAppService appService, 
             IDataService dataService, 
-            IImagingService imagingService,
             IMessenger messenger,
             ILogger<MainViewModel> logger)
         {
             _settings = settings.Value;
             _appService = appService;
             _dataService = dataService;
-            _imgService = imagingService;
             _messenger = messenger;
             _logger= logger;
             HashImageSize = _settings.HashImageSize;
@@ -183,9 +206,11 @@ namespace DedupWinUI.ViewModels
             SourcePath = settings.Value.SourcePath;
             SourceImageScale = 100.0f;
             ThumbnailSize = _settings.ThumbnailSize;
+            LastSimilarScanOption = "Folder";
             Images = new ObservableCollection<ImageModel>();
+            SimilarImages = new ObservableCollection<ImageModel>();
             DeleteFilesCommand = new CommandEventHandler<ImageModel>(async (model) => await DeleteFiles(model));
-            GetSimilarImagesCommand = new CommandEventHandler<string>((path) => GetSimilarImages(path));
+            GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
             ScanFilesCommand = new CommandEventHandler<string>(async path => await ScanFiles());
             ZoomInCommand = new CommandEventHandler<object>((_) => ZoomInImage(_));
@@ -197,8 +222,6 @@ namespace DedupWinUI.ViewModels
         {
             await DeleteModelAsync(model);
         }
-
-
 
         public async Task<bool> DeleteModelAsync(ImageModel model)
         {
@@ -235,11 +258,43 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        private void GetSimilarImages(string path)
+        /// <summary>
+        /// Scans the specified source for similar images
+        /// </summary>
+        /// <param name="path">"Repo" to search globally, 
+        /// "Folder" to search in the current folder</param>
+        private void GetSimilarImages(string option)
         {
-            throw new NotImplementedException();
-        }
+            
+            if (string.IsNullOrEmpty(option))
+            {
+                if (string.IsNullOrEmpty(LastSimilarScanOption))
+                {
+                    throw new Exception("Cannot resolve the type of scan to perform for similar images");
+                }
+                option = LastSimilarScanOption;
+            }
+            switch (option)
+            {
+                case "Repo":
+                    Log.Information("Get Similar images from Repo");
+                    LastSimilarScanOption = option;
+                    var similar = new List<ImageModel>();
+                    SimilarImages = new ObservableCollection<ImageModel>(similar);
+                    break;
 
+                case "Folder":
+                    Log.Information("Get Similar images from Folder");
+                    LastSimilarScanOption = option;
+                    var comparedModels = Images.Where(o=>o.RelativePath==SelectedModel.RelativePath).ToList();
+                    var similarModels = _appService.GetSimilarImages(SelectedModel, comparedModels);
+                    Log.Information($"Found {similarModels.Count} similar images for {SelectedModel.FileName} from a total of {comparedModels.Count-1} siblings");
+                    SimilarImages = new ObservableCollection<ImageModel>(similarModels);
+                    break;
+                default:
+                    throw new Exception($"Undefined option ('{option}') for use in getting similar images");
+            }
+        }
 
         private void RenameFile(string path)
         {
@@ -250,7 +305,7 @@ namespace DedupWinUI.ViewModels
         {
             try
             {
-                await _dataService.CreateTablesAsync();//TODO: To be deleted
+                //await _dataService.CreateTablesAsync();//TODO: To be deleted
                 var fileNames = await _appService.GetSourceFolderFilesAsync(Recurse);
                 var imgCount = fileNames.Count;
                 int partitionSize = 100;

@@ -1,8 +1,8 @@
-﻿
-using Microsoft.Extensions.Options;
-using Microsoft.UI.Xaml.Media.Imaging;
+﻿using Microsoft.UI.Xaml.Media.Imaging;
 using Shipwreck.Phash;
 using Shipwreck.Phash.Bitmaps;
+using Shipwreck.Phash.Imaging;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Drawing.Imaging;
 using Windows.Graphics.Imaging;
@@ -12,11 +12,7 @@ namespace Services
 {
     public class ImagingService : IImagingService
     {
-
-        //public ImagingService(IOptions<AppSettings> settings, IFileService fileService)
-        //{
-        //}
-
+         
         public static async Task<SoftwareBitmap> BmpToSBmp(Bitmap bmp)
         {
             await Task.Yield();
@@ -36,6 +32,7 @@ namespace Services
             
             return sBmp;
         }
+        
         public static BitmapSource ConvertBitmapToBitmapSource(Bitmap bitmap)
         {
             using (MemoryStream memoryStream = new MemoryStream())
@@ -97,13 +94,6 @@ namespace Services
             var scale = (double)thumbnailSide / Math.Max(originalWidth, originalHeight);
             var size = new Size((int)(originalWidth * scale), (int)(originalHeight * scale));
             return (size.Width, size.Height, scale);
-        }
-
-        private Digest GetImageDigest(string filePath)
-        {
-            var img = (Bitmap)Image.FromFile(filePath);
-            var hash = ImagePhash.ComputeDigest(img.ToLuminanceImage());
-            return hash;
         }
 
         public static Bitmap MakeGrayscale(Bitmap original)
@@ -218,6 +208,72 @@ namespace Services
             return bitmapImage;
         }
         */
+        #region Similarity related methods
+
+        public static float GetCorrelation(Digest hash1, Digest hash2)
+        {
+            var score = ImagePhash.GetCrossCorrelation(hash1, hash2);
+            return score;
+        }
+
+        public static Digest GetHash(string filePath)
+        {
+            var bitmap = (Bitmap)Image.FromFile(filePath);
+            var hash = ImagePhash.ComputeDigest(bitmap.ToLuminanceImage());
+            return hash;
+        }
+
+        public static (
+            ConcurrentDictionary<string, Digest> filePathsToHashes, 
+            ConcurrentDictionary<Digest, HashSet<string>> hashesToFiles) 
+            GetHashes(List<string> files)
+        {
+            var filePathsToHashes = new ConcurrentDictionary<string, Digest>();
+            var hashesToFiles = new ConcurrentDictionary<Digest, HashSet<string>>();
+
+            Parallel.ForEach(files, (currentFile) =>
+            {
+                var bitmap = (Bitmap)Image.FromFile(currentFile);
+                var hash = ImagePhash.ComputeDigest(bitmap.ToLuminanceImage());
+                filePathsToHashes[currentFile] = hash;
+
+                HashSet<string> currentFilesForHash;
+
+                lock (hashesToFiles)
+                {
+                    if (!hashesToFiles.TryGetValue(hash, out currentFilesForHash))
+                    {
+                        currentFilesForHash = new HashSet<string>();
+                        hashesToFiles[hash] = currentFilesForHash;
+                    }
+                }
+
+                lock (currentFilesForHash)
+                {
+                    currentFilesForHash.Add(currentFile);
+                }
+            });
+
+            return (filePathsToHashes, hashesToFiles);
+        }
+
+        public static ConcurrentDictionary<string, float> GetSimilarImages(float threshold, string filePath, List<string> siblings)
+        {
+            var hash = GetHash(filePath);
+            var hashes = GetHashes(siblings);
+            var res = new ConcurrentDictionary<string, float>();
+            foreach (var fileHash in hashes.filePathsToHashes)
+            {
+                var correlation = GetCorrelation(hash, fileHash.Value);
+                if (correlation > threshold)
+                {
+                    res.TryAdd(fileHash.Key,correlation);
+                }
+            }
+            return res;
+        }
+
+        #endregion
     }
 
 }

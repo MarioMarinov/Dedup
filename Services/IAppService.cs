@@ -8,6 +8,7 @@ namespace Services
         Task<List<String>> GetRecycleBinFilesAsync();
         Task<List<ImageModel>> GenerateImageModelsAsync(IEnumerable<string> fileNames);
         Task<List<ImageModel>> GetRecycleBinImageModelsAsync();
+        List<ImageModel> GetSimilarImages(ImageModel leadModel, List<ImageModel> comparedModels, float threshold);
         Task<List<ImageModel>> ScanSourceFolderAsync(List<string> fileNames);
         Task<bool> DeleteImageAsync(ImageModel model);
     }

@@ -210,38 +210,16 @@ namespace Services
             return models.ToList();
         }
 
-        public static 
-            (ConcurrentDictionary<string, Digest> filePathsToHashes, ConcurrentDictionary<Digest, HashSet<string>> hashesToFiles) 
-            GetHashes(List<string> files)
+        public List<ImageModel> GetSimilarImages(ImageModel leadModel, List<ImageModel> comparedModels, float threshold)
         {
-            var filePathsToHashes = new ConcurrentDictionary<string, Digest>();
-            var hashesToFiles = new ConcurrentDictionary<Digest, HashSet<string>>();
-
-            Parallel.ForEach(files, (currentFile) =>
-            {
-                var bitmap = (Bitmap)Image.FromFile(currentFile);
-                var hash = ImagePhash.ComputeDigest(bitmap.ToLuminanceImage());
-                filePathsToHashes[currentFile] = hash;
-
-                HashSet<string> currentFilesForHash;
-
-                lock (hashesToFiles)
-                {
-                    if (!hashesToFiles.TryGetValue(hash, out currentFilesForHash))
-                    {
-                        currentFilesForHash = new HashSet<string>();
-                        hashesToFiles[hash] = currentFilesForHash;
-                    }
-                }
-
-                lock (currentFilesForHash)
-                {
-                    currentFilesForHash.Add(currentFile);
-                }
-            });
-
-            return (filePathsToHashes, hashesToFiles);
+            var siblingFileNames = comparedModels
+                .Where(o=>o.FileName!=leadModel.FileName)
+                .Select(o=>o.ThumbnailSource).ToList();
+            var correlated = ImagingService.GetSimilarImages(threshold, leadModel.ThumbnailSource, siblingFileNames);
+            var similar = comparedModels.Where(o => correlated.ContainsKey(o.ThumbnailSource)).ToList();
+            return similar;
         }
 
+        
     }
 }

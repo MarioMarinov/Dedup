@@ -14,6 +14,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Windows.Storage.Search;
 
 namespace DedupWinUI.ViewModels
 {
@@ -26,7 +27,7 @@ namespace DedupWinUI.ViewModels
         private AppSettings _settings;
         private readonly ILogger<MainViewModel> _logger;
         private readonly IMessenger _messenger;
-
+        
         public int HashImageSize { get; set; }
 
         private Visibility _detailsViewVisibility;
@@ -40,6 +41,8 @@ namespace DedupWinUI.ViewModels
             }
         }
 
+      
+
         private ObservableCollection<ImageModel> _images;
         public ObservableCollection<ImageModel> Images
         {
@@ -52,17 +55,60 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        public string SourcePath { get; set; }
-
-        private bool _recurse;
-        public bool Recurse
+        private ObservableCollection<ImageModel> _similarImages;
+        public ObservableCollection<ImageModel> SimilarImages
         {
-            get { return _recurse; }
+            get { return _similarImages; }
             set
             {
-                if (_recurse == value) return;
-                _recurse = value;
-                RaisePropertyChanged(nameof(Recurse));
+                _similarImages = value;
+                RaisePropertyChanged(nameof(SimilarImages));
+            }
+        }
+
+        private ImageModel _selectedSimilarModel;
+        public ImageModel SelectedSimilarModel
+        {
+            get { return _selectedSimilarModel; }
+            set
+            {
+                if (_selectedSimilarModel != value)
+                {
+                    _selectedSimilarModel = value;
+                    RaisePropertyChanged(nameof(SelectedSimilarModel));
+                    SelectedSimilarViewModel = (_selectedSimilarModel == null) ? null : new ImageViewModel(_selectedSimilarModel);
+                }
+            }
+        }
+
+        private ImageViewModel _selectedSimilarViewModel;
+        public ImageViewModel SelectedSimilarViewModel
+        {
+            get { return _selectedSimilarViewModel; }
+            private set
+            {
+                if (_selectedSimilarViewModel != value)
+                {
+                    _selectedSimilarViewModel = value;
+                    RaisePropertyChanged(nameof(SelectedSimilarViewModel));
+                    SelectedSimilarViewVisibility = (_selectedSimilarViewModel == null) ?
+                        Visibility.Collapsed :
+                        Visibility.Visible;
+                }
+            }
+        }
+
+        private Visibility _selectedSimilarViewVisibility;
+        public Visibility SelectedSimilarViewVisibility
+        {
+            get { return _selectedSimilarViewVisibility; }
+            private set
+            {
+                if (_selectedSimilarViewVisibility != value)
+                {
+                    _selectedSimilarViewVisibility = value;
+                    RaisePropertyChanged(nameof(SelectedSimilarViewVisibility));
+                }
             }
         }
 
@@ -97,15 +143,46 @@ namespace DedupWinUI.ViewModels
                 }
             }
         }
-        private async void GetImageSourceAsync(Bitmap thBitmap)
+
+        private string _lastSimilarScanOption;
+        public string LastSimilarScanOption
         {
-            var sBmp = await ImagingService.BmpToSBmp(thBitmap);
-            var src = new SoftwareBitmapSource();
-            await src.SetBitmapAsync(sBmp);
-            
-            SelectedViewModel.Thumbnail = src;
-            
+            get { return _lastSimilarScanOption; }
+            set 
+            { 
+                _lastSimilarScanOption = value; 
+                RaisePropertyChanged(nameof(LastSimilarScanOption));
+            }
         }
+
+        public string SourcePath { get; set; }
+
+        private bool _recurse;
+        public bool Recurse
+        {
+            get { return _recurse; }
+            set
+            {
+                if (_recurse == value) return;
+                _recurse = value;
+                RaisePropertyChanged(nameof(Recurse));
+            }
+        }
+
+        private float _threshold;
+        public float Threshold
+        {
+            get { return _threshold; }
+            set
+            {
+                if (_threshold != value)
+                {
+                    _threshold = value;
+                    RaisePropertyChanged(nameof(Threshold));
+                }
+            }
+        }
+
         /// <summary>
         /// Binds to the viewbox
         /// </summary>
@@ -168,14 +245,12 @@ namespace DedupWinUI.ViewModels
             IOptions<AppSettings> settings, 
             IAppService appService, 
             IDataService dataService, 
-            IImagingService imagingService,
             IMessenger messenger,
             ILogger<MainViewModel> logger)
         {
             _settings = settings.Value;
             _appService = appService;
             _dataService = dataService;
-            _imgService = imagingService;
             _messenger = messenger;
             _logger= logger;
             HashImageSize = _settings.HashImageSize;
@@ -183,22 +258,24 @@ namespace DedupWinUI.ViewModels
             SourcePath = settings.Value.SourcePath;
             SourceImageScale = 100.0f;
             ThumbnailSize = _settings.ThumbnailSize;
+            Threshold = 0.85f;
+            LastSimilarScanOption = "Folder";
             Images = new ObservableCollection<ImageModel>();
+            SimilarImages = new ObservableCollection<ImageModel>();
             DeleteFilesCommand = new CommandEventHandler<ImageModel>(async (model) => await DeleteFiles(model));
-            GetSimilarImagesCommand = new CommandEventHandler<string>((path) => GetSimilarImages(path));
+            GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
             ScanFilesCommand = new CommandEventHandler<string>(async path => await ScanFiles());
             ZoomInCommand = new CommandEventHandler<object>((_) => ZoomInImage(_));
             ZoomOutCommand = new CommandEventHandler<object>((_) => ZoomOutImage(_));
             DetailsViewVisibility = Visibility.Collapsed;
+            SelectedSimilarViewVisibility = Visibility.Collapsed;
         }
 
         private async Task DeleteFiles(ImageModel model)
         {
             await DeleteModelAsync(model);
         }
-
-
 
         public async Task<bool> DeleteModelAsync(ImageModel model)
         {
@@ -220,6 +297,16 @@ namespace DedupWinUI.ViewModels
             }
         }
 
+        private async void GetImageSourceAsync(Bitmap thBitmap)
+        {
+            var sBmp = await ImagingService.BmpToSBmp(thBitmap);
+            var src = new SoftwareBitmapSource();
+            await src.SetBitmapAsync(sBmp);
+
+            SelectedViewModel.Thumbnail = src;
+
+        }
+
         public async Task GetModelsAsync()
         {
             try
@@ -235,22 +322,51 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        private void GetSimilarImages(string path)
+        /// <summary>
+        /// Scans the specified source for similar images
+        /// </summary>
+        /// <param name="path">"Repo" to search globally, 
+        /// "Folder" to search in the current folder</param>
+        private void GetSimilarImages(string option)
         {
-            throw new NotImplementedException();
-        }
+            
+            if (string.IsNullOrEmpty(option))
+            {
+                if (string.IsNullOrEmpty(LastSimilarScanOption))
+                {
+                    throw new Exception("Cannot resolve the type of scan to perform for similar images");
+                }
+                option = LastSimilarScanOption;
+            }
+            switch (option)
+            {
+                case "Repo":
+                    Log.Information("Get Similar images from Repo");
+                    LastSimilarScanOption = option;
+                    var similar = new List<ImageModel>();
+                    SimilarImages = new ObservableCollection<ImageModel>(similar);
+                    break;
 
-
-        private void RenameFile(string path)
-        {
-            throw new NotImplementedException();
+                case "Folder":
+                    Log.Information("Get Similar images from Folder");
+                    LastSimilarScanOption = option;
+                    var comparedModels = Images.Where(o=>o.RelativePath==SelectedModel.RelativePath).ToList();
+                    var similarModels = _appService.GetSimilarImages(SelectedModel, comparedModels, Threshold);
+                    Log.Information($"Found {similarModels.Count} similar images for {SelectedModel.FileName} from a total of {comparedModels.Count-1} siblings");
+                    SimilarImages = new ObservableCollection<ImageModel>(similarModels);
+                    SelectedSimilarModel = default(ImageModel);
+                    break;
+                default:
+                    throw new Exception($"Undefined option ('{option}') for use in getting similar images");
+            }
         }
 
         public async Task ScanFiles()
         {
             try
             {
-                await _dataService.CreateTablesAsync();//TODO: To be deleted
+                //await _dataService.CreateTablesAsync();//TODO: To be deleted
+                Recurse = false;//TODO: delete and put as an option in the UI
                 var fileNames = await _appService.GetSourceFolderFilesAsync(Recurse);
                 var imgCount = fileNames.Count;
                 int partitionSize = 100;
@@ -265,7 +381,7 @@ namespace DedupWinUI.ViewModels
                     await _dataService.InsertImageDataAsync(imagesList);
                     foreach (var image in imagesList) { Images.Add(image); }
                 }
-                //await _dataService.InsertImageDataAsync(Images.ToList());
+                await _dataService.InsertImageDataAsync(Images.ToList());
                 StatusText = $"{imgCount} images";
             }
             catch (Exception ex)
@@ -275,14 +391,10 @@ namespace DedupWinUI.ViewModels
             }
             
         }
-
-        public async Task<ObservableCollection<GroupedImagesList>> GetGroupedImagesAsync(List<ImageModel> imageList)
+        
+        private void RenameFile(string path)
         {
-            var query = from item in imageList
-                        group item by item.FilePath into g orderby g.Key
-            select new GroupedImagesList(g) { Key = g.Key };
-
-            return new ObservableCollection<GroupedImagesList>(query);
+            throw new NotImplementedException();
         }
 
         private void ZoomInImage(object obj)
@@ -292,6 +404,7 @@ namespace DedupWinUI.ViewModels
                 SourceImageScale += 10;
             }
         }
+        
         private void ZoomOutImage(object obj)
         {
             if (SourceImageScale > 10)

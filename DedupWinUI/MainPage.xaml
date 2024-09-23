@@ -30,6 +30,28 @@
                     <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="&#xE76F;" FontFamily="Segoe Fluent Icons"/>
                 </Grid>
             </ControlTemplate>
+            
+            <DataTemplate x:Key="GridViewItemDataTemplate" x:DataType="models:ImageModel">
+                <GridViewItem>
+                    <Grid Width="100">
+                        <Image x:Name="ItemImage" Height="108" Width="108" Stretch="Uniform"
+                               Source="{x:Bind ThumbnailSource, Mode=OneWay}"/>
+                        <Border Background="Gray" Opacity="0.7"  VerticalAlignment="Bottom">
+                            <TextBlock Text="{x:Bind FileName}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                        </Border>
+                    </Grid>
+                </GridViewItem>
+            </DataTemplate>
+            
+            <DataTemplate x:Key="SuperimposedIconsTemplate">
+                <Grid>
+                    <FontIcon Glyph="&#xE10F;" />
+                    <!-- Example icon 1 -->
+                    <FontIcon Glyph="&#xE115;" />
+                    <!-- Example icon 2 -->
+                </Grid>
+            </DataTemplate>
+            
             <conv:ImageSourceConverter x:Key="ImageSourceConverter"/>
             <conv:PathToFileNameConverter x:Key="PathToFileNameConverter"/>
         </Grid.Resources>
@@ -50,14 +72,37 @@
 
         <CommandBar x:Name="ItemsViewCommandBar" Grid.ColumnSpan="3" DefaultLabelPosition="Right" VerticalContentAlignment="Center">
             <AppBarSeparator/>
-            <AppBarButton Label="Scan">
+            <AppBarButton Label="Scan" Command="{x:Bind ViewModel.ScanFilesCommand}">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE777;"/>
                 </AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Label="Get Similar" Icon="BrowsePhotos" x:Name="FindSimilarToSourceButton" 
-                          Click="FindSimilarToSourceButton_Click"/>
-
+            
+            <AppBarElementContainer>
+                <SplitButton x:Name="GetSimilarImages" 
+                             Loaded="GetSimilarImages_Loaded"
+                             Command="{x:Bind ViewModel.GetSimilarImagesCommand}">
+                    <SplitButton.Content>
+                        <StackPanel Orientation="Horizontal">
+                            <ContentPresenter x:Name="SelectedIcon" />
+                            <TextBlock x:Name="SelectedText" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </SplitButton.Content>
+                    <SplitButton.Flyout>
+                        <MenuFlyout x:Name="GetSimilarImagesFlyout">
+                            <MenuFlyoutItem Text="Get similar from folder" Icon="BrowsePhotos"
+                                            Command="{x:Bind ViewModel.GetSimilarImagesCommand}"
+                                            CommandParameter="Folder"
+                                            Click="MenuFlyoutItem_ScanSimilar_Click">
+                            </MenuFlyoutItem>
+                            <MenuFlyoutItem Text="Get similar from repo" Icon="BrowsePhotos"
+                                            Command="{x:Bind ViewModel.GetSimilarImagesCommand}"
+                                            CommandParameter="Repo"
+                                            Click="MenuFlyoutItem_ScanSimilar_Click"/>
+                        </MenuFlyout>
+                    </SplitButton.Flyout>
+                </SplitButton>
+            </AppBarElementContainer>
             <AppBarSeparator/>
 
             <AppBarButton Label="Zoom Out" Command="{x:Bind ViewModel.ZoomOutCommand}" Icon="ZoomOut" />
@@ -105,23 +150,10 @@
 
         <GridView x:Name="ItemsGridView" Grid.Row="1"
                   ItemsSource="{x:Bind ViewModel.Images, Mode=OneWay}"
+                  ItemTemplate="{StaticResource GridViewItemDataTemplate}"
                   SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
-                  CanDragItems="True" KeyUp="ItemsGridView_KeyUp">
-            <!--ContainerContentChanging="ItemsGridView_ContainerContentChanging"-->
-                <GridView.ItemTemplate>
-                    <DataTemplate x:DataType="models:ImageModel">
-                        <GridViewItem Tapped="GridViewItem_Tapped" >
-                            <Grid Width="100">
-                                <Image x:Name="ItemImage" Height="108" Width="108" Stretch="Uniform"
-                                       Source="{x:Bind ThumbnailSource, Mode=OneWay}"/>
-                                <Border Background="Gray" Opacity="0.7"  VerticalAlignment="Bottom">
-                                    <TextBlock Text="{x:Bind FileName}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
-                                </Border>
-                            </Grid>
-                        </GridViewItem>
-                    </DataTemplate>
-                </GridView.ItemTemplate>
-            </GridView>
+                  CanDragItems="True" KeyUp="ItemsGridView_KeyUp"/>
+
         <controls:GridSplitter Grid.Column="1" Grid.Row="1" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
                                Template="{StaticResource HorizontalGridSplitterTemplate}"/>
         <Grid x:Name="Details" Grid.Column="2" Grid.Row="1">
@@ -148,77 +180,124 @@
                         <RowDefinition/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- selected image preview-->
-                    <ScrollViewer>
-                        <Image x:Name="SelectedImage"
-                               Source="{x:Bind ViewModel.SelectedViewModel.Image, Mode=OneWay}" 
-                               Scale="{x:Bind ViewModel.SourceImageViewboxScale, Mode=OneWay}"
-                               Stretch="Uniform"/>
-                    </ScrollViewer>
-                    
-                    <Grid x:Name="FileInfoDetails" Grid.Row="1" VerticalAlignment="Top">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="Directory: " Grid.Row="0" Grid.Column="0" Style="{StaticResource Label}"/>
-                        <TextBlock Text="File: " Grid.Row="1" Grid.Column="0" Style="{StaticResource Label}"/>
-                        <TextBlock Text="W x H: " Grid.Row="2" Grid.Column="0" Style="{StaticResource Label}"/>
-                        <TextBlock Text="Size: "  Grid.Row="3" Grid.Column="0" Style="{StaticResource Label}"/>
-                        <TextBlock Text="Created: "  Grid.Row="4" Grid.Column="0" Style="{StaticResource Label}"/>
-                        <TextBlock Text="Thumbnails:"  Grid.Row="5" Grid.Column="0" Style="{StaticResource Label}"/>
+                    <!-- selected image details-->
+                    <controls:DockPanel x:Name="SelectedImageView" LastChildFill="True">
+                        <ScrollViewer controls:DockPanel.Dock="Top">
+                            <Image x:Name="SelectedImage"
+                                   Source="{x:Bind ViewModel.SelectedViewModel.Image, Mode=OneWay}" 
+                                   Scale="{x:Bind ViewModel.SourceImageViewboxScale, Mode=OneWay}"
+                                   Stretch="Uniform"/>
+                        </ScrollViewer>
 
-                        <TextBlock Text="{x:Bind ViewModel.SelectedViewModel.Model.RelativePath, Mode=OneWay}" Grid.Row="0" Grid.Column="1"/>
-                        <TextBlock Text="{x:Bind ViewModel.SelectedViewModel.FileName, Mode=OneWay}" TextWrapping="Wrap" Grid.Row="1" Grid.Column="1"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1">
-                            <Run Text="{x:Bind ViewModel.SelectedViewModel.Dimensions.Width, Mode=OneWay}"/>
-                            <Run Text="x"/>
-                            <Run Text="{x:Bind ViewModel.SelectedViewModel.Dimensions.Height, Mode=OneWay}"/>
-                            <Run Text="px."/>
-                        </TextBlock>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{x:Bind GetLengthText(ViewModel.SelectedViewModel.Length), Mode=OneWay}"/>
-                        <TextBlock Text="{x:Bind ViewModel.SelectedViewModel.CreationTime, Mode=OneWay}" Grid.Row="4" Grid.Column="1"/>
-                        <!-- small and smaller thumbnail used for image analysis-->
-                        <StackPanel Grid.Column="1" Grid.Row="5" Orientation="Horizontal">
-                            <Border BorderThickness="1" BorderBrush="{ThemeResource BackButtonForegroundThemeBrush}" Margin="0,1,2,0" VerticalAlignment="Top"
-                                    Width="{x:Bind ViewModel.ThumbnailSize}" Height="{x:Bind ViewModel.ThumbnailSize}">
-                                <!--<Image  Source="{x:Bind ViewModel.SelectedViewModel.Model.ThumbnailSource, Mode=OneWay}" Stretch="None"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>-->
-                                <Image  Source="{x:Bind ViewModel.SelectedViewModel.Thumbnail, Mode=OneWay}" Stretch="None"
-        HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <Border BorderThickness="1" BorderBrush="{ThemeResource BackButtonForegroundThemeBrush}" Margin="0,1,2,0" VerticalAlignment="Top"
-                                    Width="{x:Bind ViewModel.HashImageSize}" Height="{x:Bind ViewModel.HashImageSize}">
-                            <Image Source="{x:Bind ViewModel.SelectedViewModel.Model.ImageHashSource, Mode=OneWay}"  Stretch="None"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
-                    <ScrollViewer Grid.Column="2">
-                        <Image x:Name="SimilarImage"
-                               Source="{x:Bind ViewModel.SelectedViewModel.Image, Mode=OneWay}"
-                               Scale="{x:Bind ViewModel.SourceImageViewboxScale, Mode=OneWay}"
-                               Stretch="UniformToFill"/>
-                        <!---->
-                    </ScrollViewer>
-                    <!-- similar image preview -->
-                    <!--<Viewbox Scale="{x:Bind ViewModel.SourceImageViewboxScale, Mode=OneWay}" Grid.Column="2"
-                        VerticalAlignment="Top" HorizontalAlignment="Left">
-                        <Image Source="{x:Bind ViewModel.SelectedViewModel.FullName, Mode=OneWay}" Stretch="Uniform"/>
-                    </Viewbox>-->
+                        <Grid x:Name="SelectedImageInfo" VerticalAlignment="Top">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Directory: " Grid.Row="0" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="File: " Grid.Row="1" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="W x H: " Grid.Row="2" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Size: "  Grid.Row="3" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Created: "  Grid.Row="4" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Thumbnails:"  Grid.Row="5" Grid.Column="0" Style="{StaticResource Label}"/>
+
+                            <TextBlock Text="{x:Bind ViewModel.SelectedViewModel.Model.RelativePath, Mode=OneWay}" Grid.Row="0" Grid.Column="1"/>
+                            <TextBlock Text="{x:Bind ViewModel.SelectedViewModel.FileName, Mode=OneWay}" TextWrapping="Wrap" Grid.Row="1" Grid.Column="1"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1">
+                                <Run Text="{x:Bind ViewModel.SelectedViewModel.Dimensions.Width, Mode=OneWay}"/>
+                                <Run Text="x"/>
+                                <Run Text="{x:Bind ViewModel.SelectedViewModel.Dimensions.Height, Mode=OneWay}"/>
+                                <Run Text="px."/>
+                            </TextBlock>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{x:Bind GetLengthText(ViewModel.SelectedViewModel.Length), Mode=OneWay}"/>
+                            <TextBlock Text="{x:Bind ViewModel.SelectedViewModel.CreationTime, Mode=OneWay}" Grid.Row="4" Grid.Column="1"/>
+                            <!-- small and smaller thumbnail used for image analysis-->
+                            <StackPanel Grid.Column="1" Grid.Row="5" Orientation="Horizontal">
+                                <Border BorderThickness="1" BorderBrush="{ThemeResource BackButtonForegroundThemeBrush}" Margin="0,1,2,0" VerticalAlignment="Top"
+                                        Width="{x:Bind ViewModel.ThumbnailSize}" Height="{x:Bind ViewModel.ThumbnailSize}">
+                                    <Image  Source="{x:Bind ViewModel.SelectedViewModel.Thumbnail, Mode=OneWay}" Stretch="None"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Border BorderThickness="1" BorderBrush="{ThemeResource BackButtonForegroundThemeBrush}" Margin="0,1,2,0" VerticalAlignment="Top"
+                                        Width="{x:Bind ViewModel.HashImageSize}" Height="{x:Bind ViewModel.HashImageSize}">
+                                    <Image Source="{x:Bind ViewModel.SelectedViewModel.Model.ImageHashSource, Mode=OneWay}"  Stretch="None"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </controls:DockPanel>
+                    
+                    <!-- selected similar image details -->
+                    <controls:DockPanel x:Name="SelectedSimilarView" Grid.Column="2" LastChildFill="True"
+                                        Visibility="{x:Bind ViewModel.SelectedSimilarViewVisibility, Mode=OneWay}" >
+                        <ScrollViewer controls:DockPanel.Dock="Top">
+                            <Image x:Name="SimilarImage"
+                                   Source="{x:Bind ViewModel.SelectedSimilarViewModel.Image, Mode=OneWay}"
+                                   Scale="{x:Bind ViewModel.SourceImageViewboxScale, Mode=OneWay}"
+                                   Stretch="UniformToFill"/>
+                        </ScrollViewer>
+                        <Grid x:Name="SelectedSimilarImageInfo" VerticalAlignment="Top" >
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Directory: " Grid.Row="0" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="File: " Grid.Row="1" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="W x H: " Grid.Row="2" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Size: "  Grid.Row="3" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Created: "  Grid.Row="4" Grid.Column="0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Thumbnails:"  Grid.Row="5" Grid.Column="0" Style="{StaticResource Label}"/>
+
+                            <TextBlock Text="{x:Bind ViewModel.SelectedSimilarViewModel.Model.RelativePath, Mode=OneWay}" Grid.Row="0" Grid.Column="1"/>
+                            <TextBlock Text="{x:Bind ViewModel.SelectedSimilarViewModel.FileName, Mode=OneWay}" TextWrapping="Wrap" Grid.Row="1" Grid.Column="1"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1">
+                                <Run Text="{x:Bind ViewModel.SelectedSimilarViewModel.Dimensions.Width, Mode=OneWay}"/>
+                                <Run Text="x"/>
+                                <Run Text="{x:Bind ViewModel.SelectedSimilarViewModel.Dimensions.Height, Mode=OneWay}"/>
+                                <Run Text="px."/>
+                            </TextBlock>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{x:Bind GetLengthText(ViewModel.SelectedSimilarViewModel.Length), Mode=OneWay}"/>
+                            <TextBlock Text="{x:Bind ViewModel.SelectedSimilarViewModel.CreationTime, Mode=OneWay}" Grid.Row="4" Grid.Column="1"/>
+                            <!-- small and smaller thumbnail used for image analysis-->
+                            <StackPanel Grid.Column="1" Grid.Row="5" Orientation="Horizontal">
+                                <Border BorderThickness="1" BorderBrush="{ThemeResource BackButtonForegroundThemeBrush}" Margin="0,1,2,0" VerticalAlignment="Top"
+                                        Width="{x:Bind ViewModel.ThumbnailSize}" Height="{x:Bind ViewModel.ThumbnailSize}">
+                                    <Image  Source="{x:Bind ViewModel.SelectedSimilarViewModel.Thumbnail, Mode=OneWay}" Stretch="None"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Border BorderThickness="1" BorderBrush="{ThemeResource BackButtonForegroundThemeBrush}" Margin="0,1,2,0" VerticalAlignment="Top"
+                                        Width="{x:Bind ViewModel.HashImageSize}" Height="{x:Bind ViewModel.HashImageSize}">
+                                    <Image Source="{x:Bind ViewModel.SelectedSimilarViewModel.Model.ImageHashSource, Mode=OneWay}"  Stretch="None"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                         </Grid>
+                        
+                    </controls:DockPanel>
                 </Grid>
             </ScrollViewer>
             <controls:GridSplitter Grid.Row="1" Height="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Rows"
                        Template="{StaticResource VerticalGridSplitterTemplate}"/>
-            <GridView x:Name="SimilarImagesGridView" Grid.Row="2"/>
+            <GridView x:Name="SimilarImagesGridView" Grid.Row="2"
+                      ItemsSource="{x:Bind ViewModel.SimilarImages, Mode=OneWay}"
+                      ItemTemplate="{StaticResource GridViewItemDataTemplate}"
+                      SelectedItem="{x:Bind ViewModel.SelectedSimilarModel, Mode=TwoWay}"/>
         </Grid>
     </Grid>
 </Page>

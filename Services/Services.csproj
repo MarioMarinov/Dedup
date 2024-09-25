@@ -4,6 +4,7 @@
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
     <WindowsSdkPackageVersion>10.0.26100.41</WindowsSdkPackageVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+    <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
     <UseWinUI>true</UseWinUI>
     <PlatformTarget>AnyCPU</PlatformTarget>

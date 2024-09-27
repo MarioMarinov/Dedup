@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.VisualStudio.Language.Intellisense;
 using Serilog;
 using Services;
 using Services.Models;
@@ -14,7 +15,6 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Windows.Storage.Search;
 
 namespace DedupWinUI.ViewModels
 {
@@ -43,8 +43,8 @@ namespace DedupWinUI.ViewModels
 
       
 
-        private ObservableCollection<ImageModel> _images;
-        public ObservableCollection<ImageModel> Images
+        private BulkObservableCollection<ImageModel> _images;
+        public BulkObservableCollection<ImageModel> Images
         {
             get { return _images; }
             set
@@ -260,7 +260,7 @@ namespace DedupWinUI.ViewModels
             ThumbnailSize = _settings.ThumbnailSize;
             Threshold = 0.85f;
             LastSimilarScanOption = "Folder";
-            Images = new ObservableCollection<ImageModel>();
+            Images = new BulkObservableCollection<ImageModel>();
             SimilarImages = new ObservableCollection<ImageModel>();
             DeleteFilesCommand = new CommandEventHandler<ImageModel>(async (model) => await DeleteFiles(model));
             GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
@@ -313,7 +313,10 @@ namespace DedupWinUI.ViewModels
             {
                 var models = await _appService.GetModelsAsync();
                 _logger.LogInformation($"{models.Count} files loaded");
-                Images = new ObservableCollection<ImageModel>(models);
+                Images = new BulkObservableCollection<ImageModel>();
+                Images.BeginBulkOperation();
+                Images.AddRange(models);
+                Images.EndBulkOperation();
             }
             catch (Exception ex)
             {
@@ -379,7 +382,9 @@ namespace DedupWinUI.ViewModels
                     StatusText = $"Reading group {i + 1}/{partitionCount} | {rangeStart}-{rangeStart+count}/{imgCount}";
                     var imagesList = await _appService.ScanSourceFolderAsync(chunk);
                     await _dataService.InsertImageDataAsync(imagesList);
-                    foreach (var image in imagesList) { Images.Add(image); }
+                    Images.BeginBulkOperation();
+                    Images.AddRange(imagesList);
+                    Images.EndBulkOperation();
                 }
                 await _dataService.InsertImageDataAsync(Images.ToList());
                 StatusText = $"{imgCount} images";

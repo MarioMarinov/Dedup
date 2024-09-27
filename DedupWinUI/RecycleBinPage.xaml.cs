@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using Services.Models;
 using System.Linq;
+using System.Threading.Tasks;
 
 
 namespace DedupWinUI
@@ -17,7 +18,7 @@ namespace DedupWinUI
         {
             this.InitializeComponent();
             var host = ((App)Application.Current).Host;
-            SelectionMode = ListViewSelectionMode.Single;
+            SelectionMode = ListViewSelectionMode.Multiple;
             ViewModel = host.Services.GetRequiredService<RecycleBinViewModel>();
             InitializeAsync();
         }
@@ -39,7 +40,7 @@ namespace DedupWinUI
         {
             base.OnNavigatedTo(e);
         }
-        
+        /*
         private void SelectionModeButton_Click(object sender, RoutedEventArgs e)
         {
             if (SelectionMode == ListViewSelectionMode.Single)
@@ -56,14 +57,34 @@ namespace DedupWinUI
             }
             RecycleBinItemsView.SelectionMode = SelectionMode;
         }
-        
+        */
         private void UndeleteButton_Click(object sender, RoutedEventArgs e)
         {
             var selection = RecycleBinItemsView.SelectedItems.Cast<ImageModel>().ToList();
-            ViewModel.Undelete(selection);
+            ViewModel.UndeleteAsync(selection);
 
         }
 
-        
+        private void DeleteButton_Click(object sender, RoutedEventArgs e)
+        {
+            var selection = RecycleBinItemsView.SelectedItems.Cast<ImageModel>().ToList();
+            ViewModel.Delete(selection);
+        }
+
+        private void EmptyRecycleBinButton_Click(object sender, RoutedEventArgs e)
+        {
+            var selection = ViewModel.Images.ToList<ImageModel>();
+            ViewModel.Delete(selection);
+        }
+
+        private void SelectAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            RecycleBinItemsView.SelectAll();
+        }
+
+        private void UnselectAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            RecycleBinItemsView.SelectedItems.Clear();
+        }
     }
 }

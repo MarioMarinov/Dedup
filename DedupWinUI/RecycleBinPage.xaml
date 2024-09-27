@@ -49,12 +49,16 @@
                         ToolTipService.ToolTip="Back" 
                         VerticalAlignment="Top"/>
             </CommandBar.Content>
-            <AppBarButton x:Name="SelectionModeButton" Label="Mutiple select" Click="SelectionModeButton_Click">
+            <!--<AppBarButton x:Name="SelectionModeButton" Label="Mutiple select" Click="SelectionModeButton_Click">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE762;"/>
                 </AppBarButton.Icon>
-            </AppBarButton>
+            </AppBarButton>-->
+            <AppBarButton x:Name="SelectAllButton" Icon="SelectAll" Label="Select All" Click="SelectAllButton_Click"/>
+            <AppBarButton x:Name="UnselectAllButton" Icon="AllApps" Label="Unselect All" Click="UnselectAllButton_Click"/>
             <AppBarButton x:Name="UndeleteButton" Icon="Undo" Label="Undelete" Click="UndeleteButton_Click"/>
+            <AppBarButton x:Name="DeleteButton" Icon="Clear" Foreground="Red" Label="Delete" Click="DeleteButton_Click" />
+            <AppBarButton x:Name="EmptyRecycleBinButton" Icon="Accept" Label="Empty Recycle bin" Click="EmptyRecycleBinButton_Click"/>
             
         </CommandBar>
         <ListView x:Name="RecycleBinItemsView" Grid.Row="1" SelectionMode="{x:Bind SelectionMode, Mode=TwoWay}"

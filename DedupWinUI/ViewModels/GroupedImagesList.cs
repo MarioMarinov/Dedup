@@ -3,11 +3,8 @@ using System.Collections.Generic;
 
 namespace DedupWinUI.ViewModels
 {
-    public class GroupedImagesList : List<ImageModel>
+    public class GroupedImagesList(IEnumerable<ImageModel> items) : List<ImageModel>(items)
     {
-        public GroupedImagesList(IEnumerable<ImageModel> items) : base(items)
-        {
-        }
         public object Key { get; set; }
 
         public override string ToString()

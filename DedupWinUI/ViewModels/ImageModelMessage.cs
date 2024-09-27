@@ -3,15 +3,9 @@
 namespace DedupWinUI.ViewModels
 {
     public enum ImageModelChange { Created, Deleted, Restored, Edited }
-    public class ImageModelMessage
+    public class ImageModelMessage(ImageModel model, ImageModelChange change)
     {
-        public ImageModel Model { get; private set; }
-        public ImageModelChange Change { get; private set; }
-
-        public ImageModelMessage(ImageModel model, ImageModelChange change)
-        {
-            Model = model;
-            Change = change;
-        }
+        public ImageModel Model { get; private set; } = model;
+        public ImageModelChange Change { get; private set; } = change;
     }
 }

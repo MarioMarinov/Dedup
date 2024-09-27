@@ -9,24 +9,17 @@ using System.Drawing;
 
 namespace Services
 {
-    public class AppService: IAppService
+    public class AppService(
+        IFileService fileService,
+        IImagingService imagingService,
+        IDataService iDataService,
+        IOptions<AppSettings> settings) : IAppService
     {
-        private IFileService _fileService { get; set; }
-        private IImagingService _imagingService { get; set; }
-        private IDataService _dataService { get; set; }
-        private AppSettings _settings { get; set; }
+        private IFileService _fileService { get; set; } = fileService;
+        private IImagingService _imagingService { get; set; } = imagingService;
+        private IDataService _dataService { get; set; } = iDataService;
+        private AppSettings _settings { get; set; } = settings.Value;
 
-        public AppService(
-            IFileService fileService, 
-            IImagingService imagingService, 
-            IDataService iDataService,
-            IOptions<AppSettings> settings)
-        {
-            _settings = settings.Value;
-            _fileService = fileService;
-            _imagingService = imagingService;
-            _dataService = iDataService;
-        }
         public async Task<bool> DeleteImageAsync(ImageModel model)
         {
             var res = false;
@@ -77,7 +70,7 @@ namespace Services
         {
             var res = new ConcurrentBag<ImageModel>();
             var failed = new ConcurrentBag<string>();
-            ParallelOptions parallelOptions = new ParallelOptions
+            ParallelOptions parallelOptions = new()
             {
                 MaxDegreeOfParallelism = Environment.ProcessorCount
             };
@@ -93,7 +86,7 @@ namespace Services
                     failed.Add(fname);
                 }
             });
-            return res.OrderBy(f => f.RelativePath).ThenBy(f => f.FileName).ToList();
+            return [.. res.OrderBy(f => f.RelativePath).ThenBy(f => f.FileName)];
         }
         
         public async Task<List<ImageModel>> GetRecycleBinImageModelsAsync()
@@ -108,7 +101,7 @@ namespace Services
                 res.Add(imageModel);
             }
             
-            return res.OrderBy(f => f.RelativePath).ThenBy(f => f.FileName).ToList();
+            return [.. res.OrderBy(f => f.RelativePath).ThenBy(f => f.FileName)];
 
         }
         /// <summary>
@@ -178,8 +171,10 @@ namespace Services
             var fileName = fi.Name;
             var directoryName = fi.DirectoryName;
             var relPath = _fileService.GetRelPath(_settings.RecycleBinPath, directoryName ?? string.Empty);
-            var model = new ImageModel(fileName, relPath, fi.Length, null);
-            model.FilePath = filePath;
+            var model = new ImageModel(fileName, relPath, fi.Length, null)
+            {
+                FilePath = filePath
+            };
             return model;
         }
 
@@ -209,7 +204,7 @@ namespace Services
                     Console.WriteLine($"Target images not found for {model.FileName}");
                 }
             });
-            return models.ToList();
+            return [.. models];
         }
 
         public List<ImageModel> GetSimilarImages(ImageModel leadModel, List<ImageModel> comparedModels, float threshold)

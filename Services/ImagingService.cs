@@ -73,7 +73,10 @@ namespace Services
             if (bitmap.PropertyIdList.Contains(ExifOrientationId))
             {
                 var propItem = bitmap.GetPropertyItem(ExifOrientationId);
-                return BitConverter.ToUInt16(propItem.Value, 0);
+                if (propItem != null && propItem.Value != null && propItem.Value.Length >= 2)
+                {
+                    return BitConverter.ToUInt16(propItem.Value, 0);
+                }
             }
             return 1; // Default orientation
         }
@@ -269,7 +272,7 @@ namespace Services
                 var hash = ImagePhash.ComputeDigest(bitmap.ToLuminanceImage());
                 filePathsToHashes[currentFile] = hash;
 
-                HashSet<string> currentFilesForHash;
+                HashSet<string>? currentFilesForHash = null ;
 
                 lock (hashesToFiles)
                 {

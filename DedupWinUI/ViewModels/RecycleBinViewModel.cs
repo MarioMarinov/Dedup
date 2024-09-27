@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Options;
-using Microsoft.VisualStudio.Language.Intellisense;
 using Serilog;
 using Services;
 using Services.Models;
@@ -19,8 +18,8 @@ namespace DedupWinUI.ViewModels
         private readonly IAppService _appService;
         private readonly IDataService _dataService;
 
-        private BulkObservableCollection<ImageModel> _images;
-        public BulkObservableCollection<ImageModel> Images
+        private ObservableCollection<ImageModel> _images;
+        public ObservableCollection<ImageModel> Images
         {
             get { return _images; }
             set
@@ -43,10 +42,7 @@ namespace DedupWinUI.ViewModels
         public async Task RefreshRecycleBinAsync()
         {
             var images = await _appService.GetRecycleBinImageModelsAsync();
-            Images = new BulkObservableCollection<ImageModel>();
-            Images.BeginBulkOperation();
-            Images.AddRange(images);
-            Images.EndBulkOperation();
+            Images = new ObservableCollection<ImageModel>(images);
         }
 
         public async Task UndeleteAsync(List<ImageModel> selection)

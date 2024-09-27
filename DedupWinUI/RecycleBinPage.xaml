@@ -61,7 +61,8 @@
             <AppBarButton x:Name="EmptyRecycleBinButton" Icon="Accept" Label="Empty Recycle bin" Click="EmptyRecycleBinButton_Click"/>
             
         </CommandBar>
-        <ListView x:Name="RecycleBinItemsView" Grid.Row="1" SelectionMode="{x:Bind SelectionMode, Mode=TwoWay}"
+        <ListView x:Name="RecycleBinItemsView" Grid.Row="1" 
+                  SelectionMode="{x:Bind SelectionMode, Mode=TwoWay}"
                   ItemsSource="{x:Bind ViewModel.Images}"
                   ItemTemplate="{StaticResource ContactListViewTemplate}"/>
 

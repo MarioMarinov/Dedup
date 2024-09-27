@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
-using Microsoft.VisualStudio.Language.Intellisense;
 using Serilog;
 using Services;
 using Services.Models;
@@ -22,7 +21,6 @@ namespace DedupWinUI.ViewModels
     {
         
         private IAppService _appService;
-        private IImagingService _imgService;
         private IDataService _dataService;
         private AppSettings _settings;
         private readonly ILogger<MainViewModel> _logger;
@@ -43,8 +41,8 @@ namespace DedupWinUI.ViewModels
 
       
 
-        private BulkObservableCollection<ImageModel> _images;
-        public BulkObservableCollection<ImageModel> Images
+        private ObservableCollection<ImageModel> _images;
+        public ObservableCollection<ImageModel> Images
         {
             get { return _images; }
             set
@@ -143,6 +141,22 @@ namespace DedupWinUI.ViewModels
                 }
             }
         }
+
+        private List<ImageModel> _selectedModels;
+        public List<ImageModel> SelectedModels
+        {
+            get { return _selectedModels; }
+            set
+            {
+                if (_selectedModels != value)
+                {
+                    _selectedModels = value;
+                    RaisePropertyChanged(nameof(SelectedModels));
+                }
+            }
+        }
+
+
 
         private string _lastSimilarScanOption;
         public string LastSimilarScanOption
@@ -260,21 +274,24 @@ namespace DedupWinUI.ViewModels
             ThumbnailSize = _settings.ThumbnailSize;
             Threshold = 0.85f;
             LastSimilarScanOption = "Folder";
-            Images = new BulkObservableCollection<ImageModel>();
+            Images = new ObservableCollection<ImageModel>();
             SimilarImages = new ObservableCollection<ImageModel>();
-            DeleteFilesCommand = new CommandEventHandler<ImageModel>(async (model) => await DeleteFiles(model));
+            DeleteFilesCommand = new CommandEventHandler<object>(async (_) => await DeleteFilesAsync());
             GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
-            ScanFilesCommand = new CommandEventHandler<string>(async path => await ScanFiles());
-            ZoomInCommand = new CommandEventHandler<object>((_) => ZoomInImage(_));
-            ZoomOutCommand = new CommandEventHandler<object>((_) => ZoomOutImage(_));
+            ScanFilesCommand = new CommandEventHandler<object>(async (_) => await ScanFilesAsync());
+            ZoomInCommand = new CommandEventHandler<object>(ZoomInImage);
+            ZoomOutCommand = new CommandEventHandler<object>(ZoomOutImage);
             DetailsViewVisibility = Visibility.Collapsed;
             SelectedSimilarViewVisibility = Visibility.Collapsed;
         }
 
-        private async Task DeleteFiles(ImageModel model)
+        private async Task DeleteFilesAsync()
         {
-            await DeleteModelAsync(model);
+            foreach (var item in SelectedModels)
+            {
+                await DeleteModelAsync(item);
+            }
         }
 
         public async Task<bool> DeleteModelAsync(ImageModel model)
@@ -313,10 +330,7 @@ namespace DedupWinUI.ViewModels
             {
                 var models = await _appService.GetModelsAsync();
                 _logger.LogInformation($"{models.Count} files loaded");
-                Images = new BulkObservableCollection<ImageModel>();
-                Images.BeginBulkOperation();
-                Images.AddRange(models);
-                Images.EndBulkOperation();
+                Images = new ObservableCollection<ImageModel>(models);
             }
             catch (Exception ex)
             {
@@ -364,7 +378,7 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        public async Task ScanFiles()
+        public async Task ScanFilesAsync()
         {
             try
             {
@@ -382,9 +396,7 @@ namespace DedupWinUI.ViewModels
                     StatusText = $"Reading group {i + 1}/{partitionCount} | {rangeStart}-{rangeStart+count}/{imgCount}";
                     var imagesList = await _appService.ScanSourceFolderAsync(chunk);
                     await _dataService.InsertImageDataAsync(imagesList);
-                    Images.BeginBulkOperation();
-                    Images.AddRange(imagesList);
-                    Images.EndBulkOperation();
+                    foreach (var image in imagesList) { Images.Add(image); }
                 }
                 await _dataService.InsertImageDataAsync(Images.ToList());
                 StatusText = $"{imgCount} images";
@@ -402,7 +414,7 @@ namespace DedupWinUI.ViewModels
             throw new NotImplementedException();
         }
 
-        private void ZoomInImage(object obj)
+        private void ZoomInImage(object _)
         {
             if (SourceImageScale < 200)
             {
@@ -410,7 +422,7 @@ namespace DedupWinUI.ViewModels
             }
         }
         
-        private void ZoomOutImage(object obj)
+        private void ZoomOutImage(object _)
         {
             if (SourceImageScale > 10)
             {

@@ -27,7 +27,7 @@ namespace DedupWinUI
             this.InitializeComponent();
             var host = ((App)Application.Current).Host;
             ViewModel = host.Services.GetRequiredService<MainViewModel>();
-            InitializeAsync();
+            _ = InitializeAsync();
         }
 
         private async Task InitializeAsync()
@@ -39,7 +39,7 @@ namespace DedupWinUI
         {
             if (ItemsGridView.SelectedItems.Count > 0) {
                 var models = ItemsGridView.SelectedItems.Cast<ImageModel>().ToList();
-                DeleteSelectedItems(models);
+                await DeleteSelectedItemsAsync(models);
             }
         }
 
@@ -64,7 +64,7 @@ namespace DedupWinUI
             }
         }
 
-        private void DeleteSelectedItems(List<ImageModel> models)
+        private async Task DeleteSelectedItemsAsync(List<ImageModel> models)
         {
             SelectedImage.Source = null;
             SimilarImage.Source = null;
@@ -72,7 +72,7 @@ namespace DedupWinUI
             {
                 try
                 {
-                    ViewModel.DeleteModelAsync(model);
+                    await ViewModel.DeleteModelAsync(model);
                 }
                 catch (Exception ex)
                 {
@@ -156,6 +156,11 @@ namespace DedupWinUI
             {
                 SelectedIcon.Content = new SymbolIcon { Symbol = symbolIcon.Symbol };
             }
+        }
+
+        private void ItemsGridView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ViewModel.SelectedModels = ItemsGridView.SelectedItems.Cast<ImageModel>().ToList();
         }
     }
 }

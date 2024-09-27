@@ -35,7 +35,7 @@
                 <GridViewItem>
                     <Grid Width="100">
                         <Image x:Name="ItemImage" Height="108" Width="108" Stretch="Uniform"
-                               Source="{x:Bind ThumbnailSource, Mode=OneWay}"/>
+                               Source="{x:Bind ThumbnailSource}"/>
                         <Border Background="Gray" Opacity="0.7"  VerticalAlignment="Bottom">
                             <TextBlock Text="{x:Bind FileName}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
                         </Border>
@@ -116,7 +116,7 @@
 
             <AppBarButton x:Name="DeleteSourceButton" Label="Delete" Icon="Cancel" Foreground="Red"
                           Command="{x:Bind ViewModel.DeleteFilesCommand}" 
-                          CommandParameter="{x:Bind ViewModel.SelectedModel, Mode=OneWay}"/>
+                          CommandParameter="{x:Bind ViewModel.SelectedModels, Mode=TwoWay}"/>
             <AppBarButton x:Name="RecycleBinButton" Label="Recycle bin" Icon="Delete"
                           Click="NavigationButton_Click" CommandParameter="RecycleBinPage"/>
             <AppBarButton x:Name="SettingsButton" Label="Settings" Icon="Setting"
@@ -148,11 +148,13 @@
             </CommandBar.Content>
         </CommandBar>
 
-        <GridView x:Name="ItemsGridView" Grid.Row="1"
+        <GridView x:Name="ItemsGridView" Grid.Row="1" SelectionMode="Extended" CanDragItems="True"
                   ItemsSource="{x:Bind ViewModel.Images, Mode=OneWay}"
                   ItemTemplate="{StaticResource GridViewItemDataTemplate}"
                   SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
-                  CanDragItems="True" KeyUp="ItemsGridView_KeyUp"/>
+                  KeyUp="ItemsGridView_KeyUp"
+                  SelectionChanged="ItemsGridView_SelectionChanged" 
+                  />
 
         <controls:GridSplitter Grid.Column="1" Grid.Row="1" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
                                Template="{StaticResource HorizontalGridSplitterTemplate}"/>

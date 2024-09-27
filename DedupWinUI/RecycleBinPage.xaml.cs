@@ -18,7 +18,7 @@ namespace DedupWinUI
         {
             this.InitializeComponent();
             var host = ((App)Application.Current).Host;
-            SelectionMode = ListViewSelectionMode.Multiple;
+            SelectionMode = ListViewSelectionMode.Extended;
             ViewModel = host.Services.GetRequiredService<RecycleBinViewModel>();
             InitializeAsync();
         }
@@ -58,10 +58,10 @@ namespace DedupWinUI
             RecycleBinItemsView.SelectionMode = SelectionMode;
         }
         */
-        private void UndeleteButton_Click(object sender, RoutedEventArgs e)
+        private async void UndeleteButton_Click(object sender, RoutedEventArgs e)
         {
             var selection = RecycleBinItemsView.SelectedItems.Cast<ImageModel>().ToList();
-            ViewModel.UndeleteAsync(selection);
+            await ViewModel.UndeleteAsync(selection);
 
         }
 

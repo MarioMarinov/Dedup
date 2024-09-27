@@ -30,7 +30,9 @@ namespace Services
         public async Task<bool> DeleteImageAsync(ImageModel model)
         {
             var res = false;
-            var destPath = Path.Combine(_settings.RecycleBinPath,model.RelativePath);
+            if (model == null) return res;
+
+            var destPath = Path.Combine(_settings.RecycleBinPath, model.RelativePath);
             if (!Directory.Exists(destPath)) Directory.CreateDirectory(destPath);
             var destFilePath = Path.Combine(destPath, model.FileName);
             try
@@ -93,7 +95,7 @@ namespace Services
             });
             return res.OrderBy(f => f.RelativePath).ThenBy(f => f.FileName).ToList();
         }
-
+        
         public async Task<List<ImageModel>> GetRecycleBinImageModelsAsync()
         {
             var res = new ConcurrentBag<ImageModel>();
@@ -119,7 +121,7 @@ namespace Services
         {
             var fi = new FileInfo(filePath);
             var fileName = fi.Name; 
-            var directoryName = fi.DirectoryName;
+            var directoryName = fi.DirectoryName ?? "";
             var relPath = _fileService.GetRelPath(directoryName);
             var model = new ImageModel(fileName, relPath, fi.Length, null);
             model.ThumbnailSource = Path.Combine(_settings.ThumbnailsPath, model.RelativePath,

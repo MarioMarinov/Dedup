@@ -2,7 +2,7 @@
 
 namespace Services.Models
 {
-    public record ImageModel
+    public class ImageModel
     {
         /// <summary>
         /// Source Image file name
@@ -13,13 +13,13 @@ namespace Services.Models
         /// Source Image full path
         /// </summary>
         [JsonIgnore]
-        public string FilePath { get; set; }
+        public string FilePath { get; set; } = string.Empty;
         
         /// <summary>
         /// Hash image full path
         /// </summary>
         [JsonIgnore]
-        public string ImageHashSource { get; set; }
+        public string ImageHashSource { get; set; } = string.Empty;
         public string? ImageHash { get; set; }
         public long Length { get; private set; }
         
@@ -27,8 +27,8 @@ namespace Services.Models
         /// Thumbnail full path
         /// </summary>
         [JsonIgnore]
-        public string ThumbnailSource { get; set; }
-        
+        public string ThumbnailSource { get; set; } = string.Empty;
+
         /// <summary>
         /// Image's relative path from source folder
         /// </summary>

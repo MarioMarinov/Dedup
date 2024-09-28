@@ -41,14 +41,14 @@ namespace Services
                 });
         }).ConfigureAwait(false);
 
-            return allFiles.ToList();
+            return [.. allFiles];
         }
 
         private void CreateThumbnailDbRoot()
         {
             if (!Directory.Exists(_settings.ThumbnailsPath))
             {
-                var di = Directory.CreateDirectory(_settings.ThumbnailsPath);
+                _ = Directory.CreateDirectory(_settings.ThumbnailsPath);
             }
         }
 
@@ -64,16 +64,12 @@ namespace Services
         {
             try
             {
-                using (var memoryStream = new MemoryStream())
-                {
-                    image.Save(memoryStream, ImageFormat.Png);
-                    memoryStream.Position = 0;
+                using var memoryStream = new MemoryStream();
+                image.Save(memoryStream, ImageFormat.Png);
+                memoryStream.Position = 0;
 
-                    using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
-                    {
-                        await memoryStream.CopyToAsync(fileStream);
-                    }
-                }
+                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+                await memoryStream.CopyToAsync(fileStream);
                 return true;
             }
             catch (IOException ex)
@@ -111,14 +107,14 @@ namespace Services
 
         public string ConvertSourcePathToThumbnailPath(string fullFilePath)
         {
-            var relPath = fullFilePath.Substring(_settings.SourcePath.Length);
+            var relPath = fullFilePath[_settings.SourcePath.Length..];
             var destPath = Path.Combine(_settings.ThumbnailsPath, relPath);
             return destPath;
         }
 
         public string ConvertThumbnailPathToSourcePath(string fullThumbnailPath)
         {
-            var relPath = fullThumbnailPath.Substring(_settings.ThumbnailsPath.Length);
+            var relPath = fullThumbnailPath[_settings.ThumbnailsPath.Length..];
             var sourcePath = Path.Combine(_settings.SourcePath, relPath);
             return sourcePath;
         }

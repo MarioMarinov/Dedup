@@ -53,18 +53,16 @@ namespace Services
         {
             var exifOrientation = GetExifOrientation(bitmap);
             bitmap = AdjustBitmapOrientation(bitmap, exifOrientation);
-            using (MemoryStream memoryStream = new MemoryStream())
-            {
-                // Save the bitmap to the memory stream
-                bitmap.Save(memoryStream, ImageFormat.Png);
-                memoryStream.Position = 0;
+            using MemoryStream memoryStream = new();
+            // Save the bitmap to the memory stream
+            bitmap.Save(memoryStream, ImageFormat.Png);
+            memoryStream.Position = 0;
 
-                // Create a new BitmapImage
-                BitmapImage bitmapImage = new BitmapImage();
-                bitmapImage.SetSource(memoryStream.AsRandomAccessStream());
+            // Create a new BitmapImage
+            BitmapImage bitmapImage = new();
+            bitmapImage.SetSource(memoryStream.AsRandomAccessStream());
 
-                return bitmapImage;
-            }
+            return bitmapImage;
         }
         private static int GetExifOrientation(Bitmap bitmap)
         {
@@ -88,13 +86,11 @@ namespace Services
                 var th = default(Bitmap);
                 try
                 {
-                    using (var bmp = new Bitmap(fileName))
-                    {
-                        var exifOrientation = GetExifOrientation(bmp);
-                        var adjustedBitmap = AdjustBitmapOrientation(bmp, exifOrientation);
-                        var thSize = GetTransformation(bmp.Width, bmp.Height, maxSide);
-                        th = new Bitmap(adjustedBitmap, thSize.Width, thSize.Height);
-                    }
+                    using var bmp = new Bitmap(fileName);
+                    var exifOrientation = GetExifOrientation(bmp);
+                    var adjustedBitmap = AdjustBitmapOrientation(bmp, exifOrientation);
+                    var (Width, Height, Scale) = GetTransformation(bmp.Width, bmp.Height, maxSide);
+                    th = new Bitmap(adjustedBitmap, Width, Height);
                 }
                 catch (Exception ex)
                 {
@@ -113,8 +109,8 @@ namespace Services
                 {
                     var exifOrientation = GetExifOrientation(bmp);
                     var adjustedBitmap = AdjustBitmapOrientation(bmp, exifOrientation);
-                    var thSize = GetTransformation(bmp.Width, bmp.Height, maxSide);
-                    th = new Bitmap(adjustedBitmap, thSize.Width, thSize.Height);
+                    var (Width, Height, Scale) = GetTransformation(bmp.Width, bmp.Height, maxSide);
+                    th = new Bitmap(adjustedBitmap, Width, Height);
                 }
                 catch (Exception ex)
                 {
@@ -133,24 +129,22 @@ namespace Services
 
         public static Bitmap MakeGrayscale(Bitmap original)
         {
-            Bitmap newBitmap = new Bitmap(original.Width, original.Height);
+            Bitmap newBitmap = new(original.Width, original.Height);
 
             using (Graphics g = Graphics.FromImage(newBitmap))
             {
-                ColorMatrix colorMatrix = new ColorMatrix(new float[][]
-                {
-            new float[] { 0.3f, 0.3f, 0.3f, 0, 0 },
-            new float[] { 0.59f, 0.59f, 0.59f, 0, 0 },
-            new float[] { 0.11f, 0.11f, 0.11f, 0, 0 },
-            new float[] { 0, 0, 0, 1, 0 },
-            new float[] { 0, 0, 0, 0, 1 }
-                });
+                ColorMatrix colorMatrix = new(
+                [
+                [0.3f, 0.3f, 0.3f, 0, 0],
+                [0.59f, 0.59f, 0.59f, 0, 0],
+                [0.11f, 0.11f, 0.11f, 0, 0],
+                [0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1]
+                ]);
 
-                using (ImageAttributes attributes = new ImageAttributes())
-                {
-                    attributes.SetColorMatrix(colorMatrix);
-                    g.DrawImage(original, new Rectangle(0, 0, original.Width, original.Height), 0, 0, original.Width, original.Height, GraphicsUnit.Pixel, attributes);
-                }
+                using ImageAttributes attributes = new();
+                attributes.SetColorMatrix(colorMatrix);
+                g.DrawImage(original, new Rectangle(0, 0, original.Width, original.Height), 0, 0, original.Width, original.Height, GraphicsUnit.Pixel, attributes);
             }
 
             return newBitmap;
@@ -278,7 +272,7 @@ namespace Services
                 {
                     if (!hashesToFiles.TryGetValue(hash, out currentFilesForHash))
                     {
-                        currentFilesForHash = new HashSet<string>();
+                        currentFilesForHash = [];
                         hashesToFiles[hash] = currentFilesForHash;
                     }
                 }
@@ -295,9 +289,9 @@ namespace Services
         public static ConcurrentDictionary<string, float> GetSimilarImages(float threshold, string filePath, List<string> siblings)
         {
             var hash = GetHash(filePath);
-            var hashes = GetHashes(siblings);
+            var (filePathsToHashes, _) = GetHashes(siblings);
             var res = new ConcurrentDictionary<string, float>();
-            foreach (var fileHash in hashes.filePathsToHashes)
+            foreach (var fileHash in filePathsToHashes)
             {
                 var correlation = GetCorrelation(hash, fileHash.Value);
                 if (correlation > threshold)

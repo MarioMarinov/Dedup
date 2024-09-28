@@ -1,11 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using Serilog;
 using Services.Models;
-using Shipwreck.Phash;
-using Shipwreck.Phash.Bitmaps;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Drawing;
 
 namespace Services
 {
@@ -15,10 +11,10 @@ namespace Services
         IDataService iDataService,
         IOptions<AppSettings> settings) : IAppService
     {
-        private IFileService _fileService { get; set; } = fileService;
-        private IImagingService _imagingService { get; set; } = imagingService;
-        private IDataService _dataService { get; set; } = iDataService;
-        private AppSettings _settings { get; set; } = settings.Value;
+        private IFileService _fileService { get; } = fileService;
+        private IImagingService _imagingService { get; } = imagingService;
+        private IDataService _dataService { get; } = iDataService;
+        private AppSettings _settings { get; } = settings.Value;
 
         public async Task<bool> DeleteImageAsync(ImageModel model)
         {

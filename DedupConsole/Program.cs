@@ -77,7 +77,7 @@ stopwatch.Start();
 var models = await appSvc.GenerateImageModelsAsync(files);
 await dataSvc.CreateTablesAsync();
 
-await dataSvc.InsertImageDataAsync(models);
+await dataSvc.InsertBulkImageDataAsync(models);
 //var data = dataSvc.SelectImageDataAsync();
 stopwatch.Stop();
 Console.WriteLine($"Generated {files.Count()} files, took {stopwatch.Elapsed}");

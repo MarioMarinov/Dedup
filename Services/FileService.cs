@@ -131,45 +131,44 @@ namespace Services
             return (relPath == ".") ? string.Empty : relPath;
         }
 
-        public static void DeleteFile(string imagePath)
+        public static async Task<bool> DeleteFile(string imagePath)
         {
-            bool fileDeleted = false;
             int attempts = 0;
-            while (!fileDeleted && attempts < 5)
+            while (attempts < 5)
             {
                 try
                 {
-                    File.Delete(imagePath);
-                    fileDeleted = true;
+                    await Task.Run(() => File.Delete(imagePath));
+                    return true;
                 }
                 catch (IOException)
                 {
                     attempts++;
-                    Thread.Sleep(100); // Wait for 100 milliseconds before retrying
+                    await Task.Delay(100);
                     if (attempts == 5) throw;
                 }
             }
+            return false;
         }
 
-        public static void MoveFile(string sourcePath, string destinationPath)
+        public static async Task<bool> MoveFileAsync(string sourcePath, string destinationPath)
         {
-            bool fileDeleted = false;
             int attempts = 0;
-            while (!fileDeleted && attempts < 5)
+            while (attempts < 5)
             {
                 try
                 {
-                    File.Move(sourcePath, destinationPath);
-                    fileDeleted = true;
+                    await Task.Run(()=>File.Move(sourcePath, destinationPath));
+                    return true;
                 }
                 catch (IOException)
                 {
                     attempts++;
-                    Thread.Sleep(100); // Wait for 100 milliseconds before retrying
+                    await Task.Delay(100); 
                     if (attempts == 5) throw;
                 }
             }
-
+            return false;
         }
     }
 }

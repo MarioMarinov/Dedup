@@ -101,7 +101,7 @@ namespace Services
         /// </summary>
         /// <param name="imageData"></param>
         /// <returns></returns>
-        public async Task InsertImageDataAsync(List<ImageModel> imageData)
+        public async Task InsertBulkImageDataAsync(List<ImageModel> imageData)
         {
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync();
@@ -109,7 +109,8 @@ namespace Services
             var cmd = connection.CreateCommand();
             cmd.CommandText = """
                     INSERT INTO Images (FileName, ImageHash, Length, RelativePath)
-                    VALUES ($FileName, $ImageHash, $Length, $RelativePath);
+                    VALUES ($FileName, $ImageHash, $Length, $RelativePath)
+                    ON CONFLICT(RelativePath, FileName) DO NOTHING;
                     """;
 
             var fileNameParam = cmd.CreateParameter();

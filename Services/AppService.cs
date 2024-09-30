@@ -27,11 +27,17 @@ namespace Services
             try
             {
                 //Try to move to recycle bin first, failure to move effectively cancels the whole deletion
-                FileService.MoveFile(model.FilePath, destFilePath);
-                File.Delete(model.ThumbnailSource);
-                File.Delete(model.ImageHashSource);
-                var cnt = await _dataService.DeleteImageDataAsync([model]);
-                res = true;
+                if (await FileService.MoveFileAsync(model.FilePath, destFilePath))
+                {
+                    File.Delete(model.ThumbnailSource);
+                    File.Delete(model.ImageHashSource);
+                    var cnt = await _dataService.DeleteImageDataAsync([model]);
+                    res = true;
+                }
+                else
+                {
+                    res = false;
+                }
             }
             catch (Exception)
             {
@@ -108,6 +114,7 @@ namespace Services
         /// <returns></returns>
         private async Task<ImageModel> GenerateImageModelAsync(string filePath, CancellationToken token)
         {
+            var overwrite = true;//TODO: make that a setting
             var fi = new FileInfo(filePath);
             var fileName = fi.Name; 
             var directoryName = fi.DirectoryName ?? "";
@@ -121,7 +128,7 @@ namespace Services
             //Create the destination folder
             Directory.CreateDirectory(Path.Combine(_settings.ThumbnailsPath, model.RelativePath));
 
-            if (!File.Exists(model.ThumbnailSource))
+            if (!File.Exists(model.ThumbnailSource) || overwrite)
             {
                 //Compute the thumbnail to save
                 var th = await ImagingService.ResizeBitmapAsync(filePath, _settings.ThumbnailSize);
@@ -134,7 +141,7 @@ namespace Services
                         //throw new Exception("Cannot save the thumbnail image");
                     }
 
-                    if (!File.Exists(model.ImageHashSource))
+                    if (!File.Exists(model.ImageHashSource) || overwrite)
                     {
                         //Compute the hash image and save
                         var ih = await ImagingService.ResizeBitmapAsync(th, _settings.HashImageSize);

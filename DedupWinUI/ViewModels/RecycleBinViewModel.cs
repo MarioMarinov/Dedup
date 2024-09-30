@@ -67,7 +67,7 @@ namespace DedupWinUI.ViewModels
                     if (m != null)
                     {
                         Images.Remove(model);
-                        await _dataService.InsertImageDataAsync([model]);
+                        await _dataService.InsertBulkImageDataAsync([model]);
                     }
                     Log.Information($"Restored {model.FilePath}");
                 }

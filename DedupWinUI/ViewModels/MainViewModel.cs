@@ -2,16 +2,15 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Media.Imaging;
 using Serilog;
 using Services;
 using Services.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Drawing;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -20,11 +19,10 @@ namespace DedupWinUI.ViewModels
     public class MainViewModel : BaseViewModel
     {
         
-        private IAppService _appService;
-        private IDataService _dataService;
-        private AppSettings _settings;
+        private readonly IAppService _appService;
+        private readonly IDataService _dataService;
+        private readonly AppSettings _settings;
         private readonly ILogger<MainViewModel> _logger;
-        private readonly IMessenger _messenger;
         
         public int HashImageSize { get; set; }
 
@@ -49,7 +47,7 @@ namespace DedupWinUI.ViewModels
             {
                 _images = value;
                 RaisePropertyChanged(nameof(Images));
-                StatusText = $"{_images.Count} files found";
+                StatusText = $"{_images.Count} images";
             }
         }
 
@@ -259,13 +257,11 @@ namespace DedupWinUI.ViewModels
             IOptions<AppSettings> settings, 
             IAppService appService, 
             IDataService dataService, 
-            IMessenger messenger,
             ILogger<MainViewModel> logger)
         {
             _settings = settings.Value;
             _appService = appService;
             _dataService = dataService;
-            _messenger = messenger;
             _logger= logger;
             HashImageSize = _settings.HashImageSize;
             Recurse = false;
@@ -274,8 +270,8 @@ namespace DedupWinUI.ViewModels
             ThumbnailSize = _settings.ThumbnailSize;
             Threshold = 0.85f;
             LastSimilarScanOption = "Folder";
-            Images = new ObservableCollection<ImageModel>();
-            SimilarImages = new ObservableCollection<ImageModel>();
+            Images = [];
+            SimilarImages = [];
             DeleteFilesCommand = new CommandEventHandler<object>(async (_) => await DeleteFilesAsync());
             GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
@@ -288,22 +284,31 @@ namespace DedupWinUI.ViewModels
 
         private async Task DeleteFilesAsync()
         {
+            var nextSelectedIndex = -1;
             foreach (var item in SelectedModels)
             {
+                if (SelectedModels.Count == 1)
+                {
+                    nextSelectedIndex = Images.IndexOf(SelectedModels[0]);
+                }
                 await DeleteModelAsync(item);
+            }
+            if (nextSelectedIndex != -1)
+            {
+                SelectedModel = Images[nextSelectedIndex];
             }
         }
 
+        
         public async Task<bool> DeleteModelAsync(ImageModel model)
         {
-            var deleted = false;
             try
             {
-                Images.Remove(model);
-                deleted = await _appService.DeleteImageAsync(model);
+                var deleted = await _appService.DeleteImageAsync(model);
                 if (deleted)
                 {
-                    StatusText =$"{Images.Count} images";
+                    Images.Remove(model);
+                    StatusText = $"{_images.Count} images";
                 }
                 return deleted;
             }
@@ -312,16 +317,6 @@ namespace DedupWinUI.ViewModels
                 Log.Error($"Unable to delete a model: {ex.Message}");
                 throw;
             }
-        }
-
-        private async void GetImageSourceAsync(Bitmap thBitmap)
-        {
-            var sBmp = await ImagingService.BmpToSBmp(thBitmap);
-            var src = new SoftwareBitmapSource();
-            await src.SetBitmapAsync(sBmp);
-
-            SelectedViewModel.Thumbnail = src;
-
         }
 
         public async Task GetModelsAsync()
@@ -334,7 +329,7 @@ namespace DedupWinUI.ViewModels
             }
             catch (Exception ex)
             {
-                var s = ex.Message;
+                Log.Error(ex.Message);
                 throw;
             }
         }
@@ -371,7 +366,7 @@ namespace DedupWinUI.ViewModels
                     var similarModels = _appService.GetSimilarImages(SelectedModel, comparedModels, Threshold);
                     Log.Information($"Found {similarModels.Count} similar images for {SelectedModel.FileName} from a total of {comparedModels.Count-1} siblings");
                     SimilarImages = new ObservableCollection<ImageModel>(similarModels);
-                    SelectedSimilarModel = default(ImageModel);
+                    SelectedSimilarModel = default;
                     break;
                 default:
                     throw new Exception($"Undefined option ('{option}') for use in getting similar images");
@@ -383,27 +378,31 @@ namespace DedupWinUI.ViewModels
             try
             {
                 //await _dataService.CreateTablesAsync();//TODO: To be deleted
-                Recurse = false;//TODO: delete and put as an option in the UI
+                Recurse = true;//TODO: delete and put as an option in the UI
+                Images.Clear();
                 var fileNames = await _appService.GetSourceFolderFilesAsync(Recurse);
                 var imgCount = fileNames.Count;
                 int partitionSize = 100;
                 var partitionCount = (imgCount + partitionSize) / partitionSize;
                 for (int i = 0; i < partitionCount; i++)
                 {
+                    Log.Information($"Proceed with partition {i + 1}/{partitionCount}");
                     var rangeStart = i * partitionSize;
                     var count = (i!=partitionCount-1)? partitionSize -1 : imgCount-(partitionCount-1)*partitionSize;
                     var chunk = fileNames.GetRange(rangeStart, count);
                     StatusText = $"Reading group {i + 1}/{partitionCount} | {rangeStart}-{rangeStart+count}/{imgCount}";
                     var imagesList = await _appService.ScanSourceFolderAsync(chunk);
-                    await _dataService.InsertImageDataAsync(imagesList);
+                    
+                    await _dataService.InsertBulkImageDataAsync(imagesList);
                     foreach (var image in imagesList) { Images.Add(image); }
                 }
-                await _dataService.InsertImageDataAsync(Images.ToList());
+                await _dataService.InsertBulkImageDataAsync([.. Images]);
                 StatusText = $"{imgCount} images";
+                Log.Information($"Scanning done, found {imgCount} images");
             }
             catch (Exception ex)
             {
-                var s = ex.Message;
+                Log.Error(ex.Message);
                 throw;
             }
             

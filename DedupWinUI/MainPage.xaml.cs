@@ -35,23 +35,12 @@ namespace DedupWinUI
             await ViewModel.GetModelsAsync();
         }
 
-        private async void DeleteSourceButton_ClickAsync(object sender, RoutedEventArgs e)
-        {
-            if (ItemsGridView.SelectedItems.Count > 0) {
-                var models = ItemsGridView.SelectedItems.Cast<ImageModel>().ToList();
-                await DeleteSelectedItemsAsync(models);
-            }
-        }
-
         private void ItemsGridView_KeyUp(object sender, KeyRoutedEventArgs e)
         {
-            if (e.Key == VirtualKey.Delete && ViewModel.SelectedModel != null)
+            if (e.Key == VirtualKey.Delete && ViewModel.SelectedModels!=null)
             {
                 var index = ViewModel.Images.IndexOf(ViewModel.SelectedModel);
-                var model = ViewModel.SelectedModel;
-                ViewModel.DeleteFilesCommand.Execute(model);
-                //DeleteSelectedItems([model]);
-
+                ViewModel.DeleteFilesCommand.Execute(null);
                 if (index < ViewModel.Images.Count)
                 {
                     ViewModel.SelectedModel = ViewModel.Images[index];
@@ -64,26 +53,6 @@ namespace DedupWinUI
             }
         }
 
-        private async Task DeleteSelectedItemsAsync(List<ImageModel> models)
-        {
-            SelectedImage.Source = null;
-            SimilarImage.Source = null;
-            foreach (var model in models)
-            {
-                try
-                {
-                    await ViewModel.DeleteModelAsync(model);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, $"Couldn't delete {model.FileName}");
-                    //throw;
-                }
-            }
-        }
-        
-
-        
         //Converters
         public string GetLengthText(long length)
         {
@@ -94,37 +63,6 @@ namespace DedupWinUI
             return string.Empty;
         }
 
-        public static async Task<Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource> ConvertToImageSource(System.Drawing.Image image)
-        {
-            if (image == null) return null;
-
-            // Convert to bitmap
-            var bitmap = new System.Drawing.Bitmap(image);
-
-            // Lock the bitmap bits and copy them to a byte array
-            var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
-                                       System.Drawing.Imaging.ImageLockMode.ReadOnly,
-                                       bitmap.PixelFormat);
-            var bytes = new byte[data.Stride * data.Height];
-            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, bytes, 0, bytes.Length);
-            bitmap.UnlockBits(data);
-
-            // Create a SoftwareBitmap from the byte array
-            var softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
-                Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                bitmap.Width,
-                bitmap.Height,
-                Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
-            softwareBitmap.CopyFromBuffer(bytes.AsBuffer());
-
-            // Convert the SoftwareBitmap to a SoftwareBitmapSource
-            var softwareBitmapSource = new Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource();
-            await softwareBitmapSource.SetBitmapAsync(softwareBitmap);
-
-            return softwareBitmapSource;
-        }
-
-        
 
         private void NavigationButton_Click(object sender, RoutedEventArgs e)
         {

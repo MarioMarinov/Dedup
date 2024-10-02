@@ -100,5 +100,7 @@ namespace DedupWinUI
         {
             ViewModel.SelectedModels = ItemsGridView.SelectedItems.Cast<ImageModel>().ToList();
         }
+
+       
     }
 }

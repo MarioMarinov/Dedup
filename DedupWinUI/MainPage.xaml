@@ -70,7 +70,63 @@
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
 
-        <CommandBar x:Name="ItemsViewCommandBar" Grid.ColumnSpan="3" DefaultLabelPosition="Right" VerticalContentAlignment="Center">
+        <CommandBar x:Name="ItemsViewCommandBar" DefaultLabelPosition="Right" VerticalContentAlignment="Center">
+            <AppBarElementContainer>
+                <ToggleSplitButton x:Name="FolderFilterButton"
+                                   IsChecked="{x:Bind ViewModel.FolderFilterApplied, Mode=TwoWay}"
+                                   Command="{x:Bind ViewModel.FilterImagesCommand}">
+                    <ToggleSplitButton.Content>
+                        <StackPanel Orientation="Horizontal">
+                            <SymbolIcon x:Name="FilterIcon" Symbol="Filter"/>
+                            <TextBlock Text="Filter" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                        </StackPanel>
+                    </ToggleSplitButton.Content>
+                    
+                    <ToggleSplitButton.Flyout>
+                        <Flyout>
+                            <StackPanel>
+                                <controls:UniformGrid Columns="2">
+                                    <Button Grid.Column="0" HorizontalAlignment="Stretch"
+                                            Command="{x:Bind ViewModel.ApplyFilterCommand}">
+                                        <Button.Content>
+                                            <controls:DockPanel LastChildFill="True">
+                                                <SymbolIcon Symbol="Accept" Foreground="Green"/>
+                                                <TextBlock Text="Apply" Margin="8,0,0,0"/>
+                                            </controls:DockPanel>
+                                        </Button.Content>
+                                    </Button>
+                                    <Button Grid.Column="1" HorizontalAlignment="Stretch"
+                                            Command="{x:Bind ViewModel.ClearFilterCommand}">
+                                        <Button.Content>
+                                            <controls:DockPanel LastChildFill="True">
+                                                <SymbolIcon Symbol="Cancel"/>
+                                                <TextBlock Text="Clear" Margin="8,0,0,0"/>
+                                            </controls:DockPanel>
+                                        </Button.Content>
+                                    </Button>
+                                </controls:UniformGrid>
+                                <ScrollViewer MaxHeight="400">
+                                    <TreeView x:Name="FolderFilterTree"
+                                              ItemsSource="{x:Bind ViewModel.RelativePathsTree.Children}">
+                                        <TreeView.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:TreeNodeViewModel">
+                                                <TreeViewItem ItemsSource="{x:Bind Children}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <CheckBox
+                                                            Content="{x:Bind Name}"
+                                                            IsChecked="{x:Bind IsChecked, Mode=TwoWay}"/>
+                                                    </StackPanel>
+                                                </TreeViewItem>
+                                            </DataTemplate>
+                                        </TreeView.ItemTemplate>
+                                    </TreeView>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Flyout>
+                    </ToggleSplitButton.Flyout>
+
+                </ToggleSplitButton>
+            </AppBarElementContainer>
             <AppBarSeparator/>
             <AppBarButton Label="Scan" Command="{x:Bind ViewModel.ScanFilesCommand}">
                 <AppBarButton.Icon>
@@ -78,10 +134,41 @@
                 </AppBarButton.Icon>
             </AppBarButton>
             
+            <!--<AppBarButton Label="Zoom Out" Command="{x:Bind ViewModel.ZoomOutCommand}" Icon="ZoomOut" />
+            <AppBarElementContainer VerticalContentAlignment="Center">
+                <Slider x:Name="ScaleSlider" Minimum="10" Maximum="200" StepFrequency="10"  MinWidth="100"
+                        Value="{x:Bind ViewModel.SourceImageScale, Mode=TwoWay}"/>
+            </AppBarElementContainer>
+            <AppBarButton Label="Zoom In" Command="{x:Bind ViewModel.ZoomInCommand}" Icon="ZoomIn"/>-->
+
+            <AppBarSeparator/>
+
+            <AppBarButton x:Name="DeleteSourceButton" Label="Delete" Icon="Cancel" Foreground="Red"
+                          Command="{x:Bind ViewModel.DeleteFilesCommand}" 
+                          CommandParameter="{x:Bind ViewModel.SelectedModels, Mode=TwoWay}"/>
+            <AppBarButton x:Name="RecycleBinButton" Label="Recycle bin" Icon="Delete"
+                          Click="NavigationButton_Click" CommandParameter="RecycleBinPage"/>
+            
+            <CommandBar.Content>
+                <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" Margin="8,0"/>
+            </CommandBar.Content>
+        </CommandBar>
+        
+        <GridView x:Name="ItemsGridView" Grid.Row="1" SelectionMode="Extended" CanDragItems="True"
+                    ItemsSource="{x:Bind ViewModel.FilteredImages, Mode=OneWay}"
+                    ItemTemplate="{StaticResource GridViewItemDataTemplate}"
+                    SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
+                    KeyUp="ItemsGridView_KeyUp"
+                    SelectionChanged="ItemsGridView_SelectionChanged" 
+                    />
+        <controls:GridSplitter Grid.Column="1" Grid.Row="1" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
+                               Template="{StaticResource HorizontalGridSplitterTemplate}"/>
+        <CommandBar x:Name="ItemDetailsCommandBar" Grid.Column="2" DefaultLabelPosition="Right" VerticalContentAlignment="Center">
+
             <AppBarElementContainer>
                 <SplitButton x:Name="GetSimilarImages" 
-                             Loaded="GetSimilarImages_Loaded"
-                             Command="{x:Bind ViewModel.GetSimilarImagesCommand}">
+             Loaded="GetSimilarImages_Loaded"
+             Command="{x:Bind ViewModel.GetSimilarImagesCommand}">
                     <SplitButton.Content>
                         <StackPanel Orientation="Horizontal">
                             <ContentPresenter x:Name="SelectedIcon" />
@@ -91,14 +178,14 @@
                     <SplitButton.Flyout>
                         <MenuFlyout x:Name="GetSimilarImagesFlyout">
                             <MenuFlyoutItem Text="Get similar from folder" Icon="BrowsePhotos"
-                                            Command="{x:Bind ViewModel.GetSimilarImagesCommand}"
-                                            CommandParameter="Folder"
-                                            Click="MenuFlyoutItem_ScanSimilar_Click">
+                            Command="{x:Bind ViewModel.GetSimilarImagesCommand}"
+                            CommandParameter="Folder"
+                            Click="MenuFlyoutItem_ScanSimilar_Click">
                             </MenuFlyoutItem>
                             <MenuFlyoutItem Text="Get similar from repo" Icon="BrowsePhotos"
-                                            Command="{x:Bind ViewModel.GetSimilarImagesCommand}"
-                                            CommandParameter="Repo"
-                                            Click="MenuFlyoutItem_ScanSimilar_Click"/>
+                            Command="{x:Bind ViewModel.GetSimilarImagesCommand}"
+                            CommandParameter="Repo"
+                            Click="MenuFlyoutItem_ScanSimilar_Click"/>
                         </MenuFlyout>
                     </SplitButton.Flyout>
                 </SplitButton>
@@ -113,30 +200,14 @@
             <AppBarButton Label="Zoom In" Command="{x:Bind ViewModel.ZoomInCommand}" Icon="ZoomIn"/>
 
             <AppBarSeparator/>
-
-            <AppBarButton x:Name="DeleteSourceButton" Label="Delete" Icon="Cancel" Foreground="Red"
-                          Command="{x:Bind ViewModel.DeleteFilesCommand}" 
-                          CommandParameter="{x:Bind ViewModel.SelectedModels, Mode=TwoWay}"/>
-            <AppBarButton x:Name="RecycleBinButton" Label="Recycle bin" Icon="Delete"
-                          Click="NavigationButton_Click" CommandParameter="RecycleBinPage"/>
-            <AppBarButton x:Name="SettingsButton" Label="Settings" Icon="Setting"
-                          Click="NavigationButton_Click" CommandParameter="SettingsPage"/>
             
-            <CommandBar.Content>
+            <AppBarButton x:Name="SettingsButton" Label="Settings" Icon="Setting"
+          Click="NavigationButton_Click" CommandParameter="SettingsPage"/>
+
+            <!--<CommandBar.Content>
                 <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" Margin="8,0"/>
-            </CommandBar.Content>
+            </CommandBar.Content>-->
         </CommandBar>
-
-        <GridView x:Name="ItemsGridView" Grid.Row="1" SelectionMode="Extended" CanDragItems="True"
-                  ItemsSource="{x:Bind ViewModel.Images, Mode=OneWay}"
-                  ItemTemplate="{StaticResource GridViewItemDataTemplate}"
-                  SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
-                  KeyUp="ItemsGridView_KeyUp"
-                  SelectionChanged="ItemsGridView_SelectionChanged" 
-                  />
-
-        <controls:GridSplitter Grid.Column="1" Grid.Row="1" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
-                               Template="{StaticResource HorizontalGridSplitterTemplate}"/>
         <Grid x:Name="Details" Grid.Column="2" Grid.Row="1">
             <Grid.RowDefinitions>
                 <!-- selected image data -->
@@ -280,5 +351,6 @@
                       ItemTemplate="{StaticResource GridViewItemDataTemplate}"
                       SelectedItem="{x:Bind ViewModel.SelectedSimilarModel, Mode=TwoWay}"/>
         </Grid>
+        
     </Grid>
 </Page>

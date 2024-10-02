@@ -86,25 +86,7 @@ namespace Services
             }
             return false;
         }
-        /*
-        /// <summary>
-        /// Save the image thumbnail into thumbnails folder
-        /// </summary>
-        /// <param name="image"></param>
-        /// <param name="filePath"></param>
-        /// <returns>The thubnmail file location in the thumbnails db</returns>
-        public async Task<string> SaveThumbnailImageAsync(Bitmap image, string filePath)
-        {
-            var destFilePath = ConvertSourcePathToThumbnailPath(filePath);
-            var destFolder = Path.GetDirectoryName(destFilePath);
-            if (!Directory.Exists(destFolder))
-                Directory.CreateDirectory(destFolder);
-            if (!File.Exists(destFilePath))
-                await SaveImageFileAsync(image, destFilePath);
-            return destFilePath;
-        }
-        */
-
+        
         public string ConvertSourcePathToThumbnailPath(string fullFilePath)
         {
             var relPath = fullFilePath[_settings.SourcePath.Length..];

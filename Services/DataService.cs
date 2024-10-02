@@ -171,6 +171,28 @@ namespace Services
             }
         }
 
+        public async Task<List<string>> GetRelativePathsAsync(string rootFolder)
+        {
+            var res = new List<string>();
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            var cmd = connection.CreateCommand();
+            var rootFolderParam = cmd.CreateParameter();
+            rootFolderParam.ParameterName = "$RootFolder";
+            rootFolderParam.Value = rootFolder;
+            cmd.Parameters.Add(rootFolderParam);
+
+            cmd.CommandText = @"SELECT DISTINCT RelativePath FROM Images 
+                                WHERE RelativePath LIKE $RootFolder || '%' ORDER BY RelativePath";
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (reader.Read())
+            {
+                res.Add(reader.GetString(0));
+            }
+            return res;
+        }
+
         public DataService(IOptions<AppSettings> settings)
         {
             _dbFileName = settings.Value.DbFilePath;

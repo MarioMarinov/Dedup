@@ -5,11 +5,14 @@ namespace Services
     {
         Task<List<ImageModel>> GetModelsAsync();
         Task<List<String>> GetSourceFolderFilesAsync(bool recurse);
-        Task<List<String>> GetRecycleBinFilesAsync();
         Task<List<ImageModel>> GenerateImageModelsAsync(IEnumerable<string> fileNames);
-        Task<List<ImageModel>> GetRecycleBinImageModelsAsync();
         List<ImageModel> GetSimilarImages(ImageModel leadModel, List<ImageModel> comparedModels, float threshold);
+        Task<List<String>> GetRecycleBinFilesAsync(); 
+        Task<List<ImageModel>> GetRecycleBinImageModelsAsync();
+        Task<TreeNode> GetRelativePathsTreeAsync(string rootFolder);
         Task<List<ImageModel>> ScanSourceFolderAsync(List<string> fileNames);
         Task<bool> DeleteImageAsync(ImageModel model);
+
+        
     }
 }

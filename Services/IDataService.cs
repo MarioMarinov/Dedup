@@ -9,5 +9,6 @@ namespace Services
         Task InitTablesAsync(string[] tableNames);
         Task InsertBulkImageDataAsync(List<ImageModel> imageData);
         Task<int> DeleteImageDataAsync(List<ImageModel> imageData);
+        Task<List<string>> GetRelativePathsAsync(string rootFolder);
     }
 }

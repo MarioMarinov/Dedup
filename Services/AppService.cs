@@ -32,7 +32,15 @@ namespace Services
                     File.Delete(model.ThumbnailSource);
                     File.Delete(model.ImageHashSource);
                     var cnt = await _dataService.DeleteImageDataAsync([model]);
-                    res = true;
+                    res = cnt > 0;
+                    if (res)
+                    {
+                        var srcPath = Path.Combine(_settings.SourcePath, model.RelativePath);
+                        if (!Directory.EnumerateFileSystemEntries(srcPath).Any())
+                        {
+                            Directory.Delete(srcPath);
+                        }
+                    }
                 }
                 else
                 {
@@ -220,6 +228,30 @@ namespace Services
             return similar;
         }
 
-        
+        public async Task<TreeNode> GetRelativePathsTreeAsync(string rootFolder)
+        {
+            var paths = await _dataService.GetRelativePathsAsync(rootFolder);
+            if (paths.Count == 0) return new TreeNode() { Name = rootFolder, RelativePath = string.Empty };
+            var root = new TreeNode { Name = paths[0], RelativePath = paths[0] };
+            for (int i = 1; i<paths.Count-1; i++)
+            {
+                var parts = paths[i].Split(Path.DirectorySeparatorChar);
+                AddFolderNode(root, parts, 0);
+            }
+            return root;
+        }
+
+        private void AddFolderNode(TreeNode current, string[] parts, int index)
+        {
+            if (index >= parts.Length) return;
+
+            var child = current.Children.FirstOrDefault(c => c.Name == parts[index]);
+            if (child == null)
+            {
+                child = new TreeNode { Name = parts[index], RelativePath = Path.Combine(current.RelativePath, parts[index]) };
+                current.Children.Add(child);
+            }
+            AddFolderNode(child, parts, index + 1);
+        }
     }
 }

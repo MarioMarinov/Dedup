@@ -1,7 +1,10 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
+﻿using ABI.System.Collections;
+using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Data;
 using Serilog;
 using Services;
 using Services.Models;
@@ -18,17 +21,19 @@ namespace DedupWinUI.ViewModels
 {
     public class MainViewModel : BaseViewModel
     {
-        
+
         private readonly IAppService _appService;
         private readonly IDataService _dataService;
         private readonly AppSettings _settings;
         private readonly ILogger<MainViewModel> _logger;
-        
+
+        private CollectionViewSource _imagesViewSource;
+
         public int HashImageSize { get; set; }
 
         private Visibility _detailsViewVisibility;
-        public Visibility DetailsViewVisibility 
-        { 
+        public Visibility DetailsViewVisibility
+        {
             get { return _detailsViewVisibility; }
             private set
             {
@@ -37,10 +42,22 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-      
+        private bool _folderFilterApplied;
+        public bool FolderFilterApplied
+        {
+            get => _folderFilterApplied;
+            set
+            {
+                if (_folderFilterApplied != value)
+                {
+                    _folderFilterApplied = value;
+                    RaisePropertyChanged(nameof(FolderFilterApplied));
+                }
+            }
+        }
 
-        private ObservableCollection<ImageModel> _images;
-        public ObservableCollection<ImageModel> Images
+        private List<ImageModel> _images;
+        public List<ImageModel> Images
         {
             get { return _images; }
             set
@@ -48,6 +65,19 @@ namespace DedupWinUI.ViewModels
                 _images = value;
                 RaisePropertyChanged(nameof(Images));
                 StatusText = $"{_images.Count} images";
+                FilterImages();
+            }
+        }
+
+        private ObservableCollection<ImageModel> _filteredImages;
+
+        public ObservableCollection<ImageModel> FilteredImages
+        {
+            get => _filteredImages;
+            set
+            {
+                _filteredImages = value;
+                RaisePropertyChanged(nameof(FilteredImages));
             }
         }
 
@@ -154,15 +184,27 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-
+        private ObservableCollection<TreeNodeViewModel> _selectedFolderFilterItems = new ObservableCollection<TreeNodeViewModel>();
+        public ObservableCollection<TreeNodeViewModel> SelectedFolderFilterItems
+        {
+            get => _selectedFolderFilterItems;
+            set
+            {
+                if (_selectedFolderFilterItems != value)
+                {
+                    _selectedFolderFilterItems = value;
+                    RaisePropertyChanged(nameof(SelectedFolderFilterItems));
+                }
+            }
+        }
 
         private string _lastSimilarScanOption;
         public string LastSimilarScanOption
         {
             get { return _lastSimilarScanOption; }
-            set 
-            { 
-                _lastSimilarScanOption = value; 
+            set
+            {
+                _lastSimilarScanOption = value;
                 RaisePropertyChanged(nameof(LastSimilarScanOption));
             }
         }
@@ -180,6 +222,22 @@ namespace DedupWinUI.ViewModels
                 RaisePropertyChanged(nameof(Recurse));
             }
         }
+
+        private TreeNodeViewModel _relativePathsTree;
+
+        public TreeNodeViewModel RelativePathsTree
+        {
+            get { return _relativePathsTree; }
+            set
+            {
+                if (_relativePathsTree != value)
+                {
+                    _relativePathsTree = value;
+                    RaisePropertyChanged(nameof(RelativePathsTree));
+                }
+            }
+        }
+
 
         private float _threshold;
         public float Threshold
@@ -231,7 +289,7 @@ namespace DedupWinUI.ViewModels
         public string StatusText
         {
             get { return _statusText; }
-            set 
+            set
             {
                 if (_statusText != value)
                 {
@@ -244,25 +302,30 @@ namespace DedupWinUI.ViewModels
         public int ThumbnailSize { get; set; }
 
         #region Commands
+        public ICommand ApplyFilterCommand { get; }
+        public ICommand ClearFilterCommand { get; }
         public ICommand DeleteFilesCommand { get; }
-        public ICommand ScanFilesCommand { get; }
+        public ICommand FolderFilterSelectionChangeCommand { get; }
+        public ICommand FilterImagesCommand { get; }
         public ICommand GetSimilarImagesCommand { get; }
+        public ICommand ScanFilesCommand { get; }
         public ICommand RenameFileCommand { get; }
         public ICommand ZoomInCommand { get; }
         public ICommand ZoomOutCommand { get; }
-        
+
         #endregion
 
         public MainViewModel(
-            IOptions<AppSettings> settings, 
-            IAppService appService, 
-            IDataService dataService, 
+            IOptions<AppSettings> settings,
+            IAppService appService,
+            IDataService dataService,
+            IMessenger messenger,
             ILogger<MainViewModel> logger)
         {
             _settings = settings.Value;
             _appService = appService;
             _dataService = dataService;
-            _logger= logger;
+            _logger = logger;
             HashImageSize = _settings.HashImageSize;
             Recurse = false;
             SourcePath = settings.Value.SourcePath;
@@ -271,8 +334,12 @@ namespace DedupWinUI.ViewModels
             Threshold = 0.85f;
             LastSimilarScanOption = "Folder";
             Images = [];
+            _imagesViewSource = new CollectionViewSource { Source = Images };
             SimilarImages = [];
+            ApplyFilterCommand = new CommandEventHandler<object>((_) => ApplyFilter());
+            ClearFilterCommand = new CommandEventHandler<object>((_) => ClearFilter());
             DeleteFilesCommand = new CommandEventHandler<object>(async (_) => await DeleteFilesAsync());
+            FilterImagesCommand = new CommandEventHandler<object>((_) => FilterImages());
             GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
             ScanFilesCommand = new CommandEventHandler<object>(async (_) => await ScanFilesAsync());
@@ -280,7 +347,12 @@ namespace DedupWinUI.ViewModels
             ZoomOutCommand = new CommandEventHandler<object>(ZoomOutImage);
             DetailsViewVisibility = Visibility.Collapsed;
             SelectedSimilarViewVisibility = Visibility.Collapsed;
+            WeakReferenceMessenger.Default.Register<MainViewModel, TreeNodeViewModel>(this, (recipient, node) =>
+            {
+                FolderFilterSelectionChanged(node);
+            });
         }
+
 
         private async Task DeleteFilesAsync()
         {
@@ -299,7 +371,7 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        
+
         public async Task<bool> DeleteModelAsync(ImageModel model)
         {
             try
@@ -323,9 +395,16 @@ namespace DedupWinUI.ViewModels
         {
             try
             {
-                var models = await _appService.GetModelsAsync();
-                _logger.LogInformation($"{models.Count} files loaded");
-                Images = new ObservableCollection<ImageModel>(models);
+                //-- Relative paths tree used to filter the images collection by folder
+                var relPathsTree = await _appService.GetRelativePathsTreeAsync(String.Empty);
+                if (relPathsTree.Name == string.Empty)
+                {
+                    relPathsTree.Name = _settings.SourcePath;
+                }
+                RelativePathsTree = new TreeNodeViewModel(relPathsTree);
+                //--
+                Images = await _appService.GetModelsAsync();
+                _logger.LogInformation($"{Images.Count} files loaded");
             }
             catch (Exception ex)
             {
@@ -341,7 +420,7 @@ namespace DedupWinUI.ViewModels
         /// "Folder" to search in the current folder</param>
         private void GetSimilarImages(string option)
         {
-            
+
             if (string.IsNullOrEmpty(option))
             {
                 if (string.IsNullOrEmpty(LastSimilarScanOption))
@@ -362,9 +441,9 @@ namespace DedupWinUI.ViewModels
                 case "Folder":
                     Log.Information("Get Similar images from Folder");
                     LastSimilarScanOption = option;
-                    var comparedModels = Images.Where(o=>o.RelativePath==SelectedModel.RelativePath).ToList();
+                    var comparedModels = Images.Where(o => o.RelativePath == SelectedModel.RelativePath).ToList();
                     var similarModels = _appService.GetSimilarImages(SelectedModel, comparedModels, Threshold);
-                    Log.Information($"Found {similarModels.Count} similar images for {SelectedModel.FileName} from a total of {comparedModels.Count-1} siblings");
+                    Log.Information($"Found {similarModels.Count} similar images for {SelectedModel.FileName} from a total of {comparedModels.Count - 1} siblings");
                     SimilarImages = new ObservableCollection<ImageModel>(similarModels);
                     SelectedSimilarModel = default;
                     break;
@@ -388,11 +467,11 @@ namespace DedupWinUI.ViewModels
                 {
                     Log.Information($"Proceed with partition {i + 1}/{partitionCount}");
                     var rangeStart = i * partitionSize;
-                    var count = (i!=partitionCount-1)? partitionSize -1 : imgCount-(partitionCount-1)*partitionSize;
+                    var count = (i != partitionCount - 1) ? partitionSize - 1 : imgCount - (partitionCount - 1) * partitionSize;
                     var chunk = fileNames.GetRange(rangeStart, count);
-                    StatusText = $"Reading group {i + 1}/{partitionCount} | {rangeStart}-{rangeStart+count}/{imgCount}";
+                    StatusText = $"Reading group {i + 1}/{partitionCount} | {rangeStart}-{rangeStart + count}/{imgCount}";
                     var imagesList = await _appService.ScanSourceFolderAsync(chunk);
-                    
+
                     await _dataService.InsertBulkImageDataAsync(imagesList);
                     foreach (var image in imagesList) { Images.Add(image); }
                 }
@@ -405,9 +484,58 @@ namespace DedupWinUI.ViewModels
                 Log.Error(ex.Message);
                 throw;
             }
-            
+
         }
-        
+
+        private void FilterImages()
+        {
+            if (FolderFilterApplied && SelectedFolderFilterItems.Count > 0)
+            {
+                var selectedFolders = SelectedFolderFilterItems.Select(x => x.RelativePath).ToArray();
+                FilteredImages = new ObservableCollection<ImageModel>(
+                    Images.Where(i => selectedFolders.Contains(i.RelativePath))
+                    );
+                Log.Information($"{FilteredImages.Count} filtered images displayed");
+            }
+            else
+            {
+                FilteredImages = new ObservableCollection<ImageModel>(Images);
+                Log.Information($"{FilteredImages.Count} unfiltered images displayed");
+            }
+        }
+
+        private void ApplyFilter()
+        {
+            FolderFilterApplied = SelectedFolderFilterItems.Count > 0;
+            FilterImages();
+        }
+
+        private void ClearFilter()
+        {
+            for (var i = SelectedFolderFilterItems.Count - 1; i >= 0; i--)
+            {
+                SelectedFolderFilterItems[i].IsChecked = false;
+            }
+            FolderFilterApplied = false;
+            FilterImages();
+        }
+
+        private void FolderFilterSelectionChanged(TreeNodeViewModel node)
+        {
+            if (node.IsChecked)
+            {
+                SelectedFolderFilterItems.Add(node);
+            }
+            else
+            {
+                SelectedFolderFilterItems.Remove(node);
+            }
+            if (SelectedFolderFilterItems.Count == 0)
+            {
+                FolderFilterApplied = false;
+            }
+        }
+
         private void RenameFile(string path)
         {
             throw new NotImplementedException();
@@ -420,7 +548,7 @@ namespace DedupWinUI.ViewModels
                 SourceImageScale += 10;
             }
         }
-        
+
         private void ZoomOutImage(object _)
         {
             if (SourceImageScale > 10)

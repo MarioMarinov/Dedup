@@ -1,19 +1,13 @@
 using DedupWinUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using System;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Threading.Tasks;
-using Windows.UI.Popups;
-using Windows.System;
-using System.Linq;
-using Serilog;
 using Services.Models;
-using System.Collections.Generic;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Windows.System;
 
 
 namespace DedupWinUI
@@ -21,12 +15,13 @@ namespace DedupWinUI
     public sealed partial class MainPage : Page
     {
         public MainViewModel ViewModel { get; }
-
+        
         public MainPage()
         {
             this.InitializeComponent();
             var host = ((App)Application.Current).Host;
             ViewModel = host.Services.GetRequiredService<MainViewModel>();
+            this.DataContext = ViewModel;
             _ = InitializeAsync();
         }
 
@@ -63,6 +58,7 @@ namespace DedupWinUI
             return string.Empty;
         }
 
+        
 
         private void NavigationButton_Click(object sender, RoutedEventArgs e)
         {
@@ -101,6 +97,5 @@ namespace DedupWinUI
             ViewModel.SelectedModels = ItemsGridView.SelectedItems.Cast<ImageModel>().ToList();
         }
 
-       
     }
 }

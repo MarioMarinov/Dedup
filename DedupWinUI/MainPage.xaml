@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="DedupWinUI.MainPage"
+    x:Name="AppMainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:DedupWinUI"
@@ -12,6 +13,9 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Page.Resources>
+        <conv:DebugConverter x:Key="DebugConverter"/>
+    </Page.Resources>
     <Grid>
         <Grid.Resources>
             <Style TargetType="FontIcon">
@@ -30,30 +34,41 @@
                     <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="&#xE76F;" FontFamily="Segoe Fluent Icons"/>
                 </Grid>
             </ControlTemplate>
-            
+
+            <DataTemplate x:Key="HeaderTemplate">
+                <GridViewHeaderItem>
+                    <TextBlock Text="{Binding Value, ElementName=ImagesViewSideSlider, Mode=OneWay, 
+                                Converter={StaticResource DebugConverter}, ConverterParameter='HeaderTemplate'}"/>
+                </GridViewHeaderItem>
+            </DataTemplate>
             <DataTemplate x:Key="GridViewItemDataTemplate" x:DataType="models:ImageModel">
-                <GridViewItem>
-                    <Grid Width="192">
-                        <Image x:Name="ItemImage" Height="192" Width="192" Stretch="Uniform"
+                <!-- Binding now updating the item size -->
+                <!--<GridViewItem>
+                    <Grid Width="{Binding Value, ElementName=ImagesViewSideSlider, Mode=OneWay, 
+                        Converter={StaticResource DebugConverter}, ConverterParameter='GridWidth'}">
+                        <Image x:Name="ItemImage" Stretch="Uniform"
+                               Height="{Binding Value, ElementName=ImagesViewSideSlider, Mode=OneWay,
+                               Converter={StaticResource DebugConverter}, ConverterParameter='GridItemHeight'}"
+                               Width="{Binding Value, ElementName=ImagesViewSideSlider, Mode=OneWay,
+                               Converter={StaticResource DebugConverter}, ConverterParameter='GridItemWidth'}" 
                                Source="{x:Bind ThumbnailSource}"/>
+                        <Border Background="Gray" Opacity="0.7"  VerticalAlignment="Bottom">
+                            <TextBlock Text="{x:Bind FileName}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                        </Border>
+                    </Grid>
+                </GridViewItem>-->
+                <!--==-->
+                <GridViewItem>
+                    <Grid Width="128">
+                        <Image x:Name="ItemImage" Stretch="Uniform"
+                                Height="128" Width="128" 
+                                Source="{x:Bind ThumbnailSource}"/>
                         <Border Background="Gray" Opacity="0.7"  VerticalAlignment="Bottom">
                             <TextBlock Text="{x:Bind FileName}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
                         </Border>
                     </Grid>
                 </GridViewItem>
             </DataTemplate>
-            
-            <DataTemplate x:Key="SuperimposedIconsTemplate">
-                <Grid>
-                    <FontIcon Glyph="&#xE10F;" />
-                    <!-- Example icon 1 -->
-                    <FontIcon Glyph="&#xE115;" />
-                    <!-- Example icon 2 -->
-                </Grid>
-            </DataTemplate>
-            
-            <conv:ImageSourceConverter x:Key="ImageSourceConverter"/>
-            <conv:PathToFileNameConverter x:Key="PathToFileNameConverter"/>
         </Grid.Resources>
         <Grid.RowDefinitions>
             <!-- command bar -->
@@ -71,6 +86,20 @@
         </Grid.ColumnDefinitions>
 
         <CommandBar x:Name="ItemsViewCommandBar" DefaultLabelPosition="Right" VerticalContentAlignment="Center">
+            <!--
+            <AppBarButton Label="Zoom Out" Command="{x:Bind ViewModel.ZoomOutCommand}" Icon="ZoomOut" />
+            <AppBarElementContainer VerticalContentAlignment="Center">
+                <Slider x:Name="ImagesViewSideSlider" StepFrequency="32"  MinWidth="100"
+                        Minimum="{x:Bind ViewModel.MinSourceGridViewItemSide}" 
+                        Maximum="{x:Bind ViewModel.MaxSourceGridViewItemSide}" 
+                        Value="{x:Bind ViewModel.SourceGridViewItemSide, Mode=TwoWay, 
+                                Converter={StaticResource DebugConverter}, 
+                                ConverterParameter='Slider'}"/>
+
+            </AppBarElementContainer>
+
+            <AppBarButton Label="Zoom In" Command="{x:Bind ViewModel.ZoomInCommand}" Icon="ZoomIn"/>
+            -->
             <AppBarElementContainer>
                 <ToggleSplitButton x:Name="FolderFilterButton"
                                    IsChecked="{x:Bind ViewModel.FolderFilterApplied, Mode=TwoWay}"
@@ -128,18 +157,12 @@
                 </ToggleSplitButton>
             </AppBarElementContainer>
             <AppBarSeparator/>
+            
             <AppBarButton Label="Scan" Command="{x:Bind ViewModel.ScanFilesCommand}">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE777;"/>
                 </AppBarButton.Icon>
             </AppBarButton>
-            
-            <!--<AppBarButton Label="Zoom Out" Command="{x:Bind ViewModel.ZoomOutCommand}" Icon="ZoomOut" />
-            <AppBarElementContainer VerticalContentAlignment="Center">
-                <Slider x:Name="ScaleSlider" Minimum="10" Maximum="200" StepFrequency="10"  MinWidth="100"
-                        Value="{x:Bind ViewModel.SourceImageScale, Mode=TwoWay}"/>
-            </AppBarElementContainer>
-            <AppBarButton Label="Zoom In" Command="{x:Bind ViewModel.ZoomInCommand}" Icon="ZoomIn"/>-->
 
             <AppBarSeparator/>
 
@@ -150,17 +173,20 @@
                           Click="NavigationButton_Click" CommandParameter="RecycleBinPage"/>
             
             <CommandBar.Content>
+                <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" Margin="8,0"/>
+                </StackPanel>
             </CommandBar.Content>
         </CommandBar>
-        
+
         <GridView x:Name="ItemsGridView" Grid.Row="1" SelectionMode="Extended" CanDragItems="True"
                     ItemsSource="{x:Bind ViewModel.FilteredImages, Mode=OneWay}"
                     ItemTemplate="{StaticResource GridViewItemDataTemplate}"
                     SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
-                    KeyUp="ItemsGridView_KeyUp"
-                    SelectionChanged="ItemsGridView_SelectionChanged" 
-                    />
+                    SelectionChanged="ItemsGridView_SelectionChanged"
+                    KeyUp="ItemsGridView_KeyUp" 
+                    >
+        </GridView>
         <controls:GridSplitter Grid.Column="1" Grid.Row="1" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
                                Template="{StaticResource HorizontalGridSplitterTemplate}"/>
         <CommandBar x:Name="ItemDetailsCommandBar" Grid.Column="2" DefaultLabelPosition="Right" VerticalContentAlignment="Center">

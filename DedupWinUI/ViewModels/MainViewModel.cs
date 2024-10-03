@@ -1,6 +1,4 @@
-﻿using ABI.System.Collections;
-using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
+﻿using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
@@ -13,7 +11,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -26,8 +23,6 @@ namespace DedupWinUI.ViewModels
         private readonly IDataService _dataService;
         private readonly AppSettings _settings;
         private readonly ILogger<MainViewModel> _logger;
-
-        private CollectionViewSource _imagesViewSource;
 
         public int HashImageSize { get; set; }
 
@@ -48,13 +43,31 @@ namespace DedupWinUI.ViewModels
             get => _folderFilterApplied;
             set
             {
-                if (_folderFilterApplied != value)
-                {
-                    _folderFilterApplied = value;
-                    RaisePropertyChanged(nameof(FolderFilterApplied));
-                }
+                if (_folderFilterApplied == value) return;
+                _folderFilterApplied = value;
+                RaisePropertyChanged(nameof(FolderFilterApplied));
             }
         }
+
+        private double _sourceGridViewItemSide;
+        public double SourceGridViewItemSide
+        {
+            get => _sourceGridViewItemSide;
+            set
+            {
+                if (_sourceGridViewItemSide == value) return;
+                _sourceGridViewItemSide = value;
+                RaisePropertyChanged(nameof(SourceGridViewItemSide));
+                Log.Information($"SourceGridViewItemSide = {SourceGridViewItemSide}");
+            }
+        }
+
+        public int MinSourceGridViewItemSide { get; }
+        public int MaxSourceGridViewItemSide { get; }
+        public int ChangeGridViewItemSideStep { get; }
+
+
+
 
         private List<ImageModel> _images;
         public List<ImageModel> Images
@@ -69,12 +82,12 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        private ObservableCollection<ImageModel> _filteredImages;
 
+        private ObservableCollection<ImageModel> _filteredImages;
         public ObservableCollection<ImageModel> FilteredImages
         {
             get => _filteredImages;
-            set
+            private set
             {
                 _filteredImages = value;
                 RaisePropertyChanged(nameof(FilteredImages));
@@ -268,9 +281,7 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        /// <summary>
-        /// Binds to the scale slider
-        /// </summary>
+        
         private float _sourceImageScale;
         public float SourceImageScale
         {
@@ -285,7 +296,6 @@ namespace DedupWinUI.ViewModels
         }
 
         private string _statusText;
-
         public string StatusText
         {
             get { return _statusText; }
@@ -326,15 +336,23 @@ namespace DedupWinUI.ViewModels
             _appService = appService;
             _dataService = dataService;
             _logger = logger;
+            
             HashImageSize = _settings.HashImageSize;
             Recurse = false;
             SourcePath = settings.Value.SourcePath;
             SourceImageScale = 100.0f;
+
             ThumbnailSize = _settings.ThumbnailSize;
             Threshold = 0.85f;
+
+            
+            MinSourceGridViewItemSide = ThumbnailSize / 3;
+            MaxSourceGridViewItemSide = ThumbnailSize;
+            SourceGridViewItemSide = ThumbnailSize;
+            ChangeGridViewItemSideStep = MinSourceGridViewItemSide;
+
             LastSimilarScanOption = "Folder";
             Images = [];
-            _imagesViewSource = new CollectionViewSource { Source = Images };
             SimilarImages = [];
             ApplyFilterCommand = new CommandEventHandler<object>((_) => ApplyFilter());
             ClearFilterCommand = new CommandEventHandler<object>((_) => ClearFilter());
@@ -361,13 +379,13 @@ namespace DedupWinUI.ViewModels
             {
                 if (SelectedModels.Count == 1)
                 {
-                    nextSelectedIndex = Images.IndexOf(SelectedModels[0]);
+                    nextSelectedIndex = FilteredImages.IndexOf(SelectedModels[0]);
                 }
                 await DeleteModelAsync(item);
             }
             if (nextSelectedIndex != -1)
             {
-                SelectedModel = Images[nextSelectedIndex];
+                SelectedModel = FilteredImages[nextSelectedIndex];
             }
         }
 
@@ -379,8 +397,8 @@ namespace DedupWinUI.ViewModels
                 var deleted = await _appService.DeleteImageAsync(model);
                 if (deleted)
                 {
-                    Images.Remove(model);
-                    StatusText = $"{_images.Count} images";
+                    FilteredImages.Remove(model);
+                    StatusText = $"{FilteredImages.Count} images";
                 }
                 return deleted;
             }
@@ -404,7 +422,7 @@ namespace DedupWinUI.ViewModels
                 RelativePathsTree = new TreeNodeViewModel(relPathsTree);
                 //--
                 Images = await _appService.GetModelsAsync();
-                _logger.LogInformation($"{Images.Count} files loaded");
+                _logger.LogInformation($"{FilteredImages.Count} files loaded");
             }
             catch (Exception ex)
             {
@@ -441,7 +459,7 @@ namespace DedupWinUI.ViewModels
                 case "Folder":
                     Log.Information("Get Similar images from Folder");
                     LastSimilarScanOption = option;
-                    var comparedModels = Images.Where(o => o.RelativePath == SelectedModel.RelativePath).ToList();
+                    var comparedModels = FilteredImages.Where(o => o.RelativePath == SelectedModel.RelativePath).ToList();
                     var similarModels = _appService.GetSimilarImages(SelectedModel, comparedModels, Threshold);
                     Log.Information($"Found {similarModels.Count} similar images for {SelectedModel.FileName} from a total of {comparedModels.Count - 1} siblings");
                     SimilarImages = new ObservableCollection<ImageModel>(similarModels);
@@ -459,6 +477,7 @@ namespace DedupWinUI.ViewModels
                 //await _dataService.CreateTablesAsync();//TODO: To be deleted
                 Recurse = true;//TODO: delete and put as an option in the UI
                 Images.Clear();
+                FilteredImages.Clear();
                 var fileNames = await _appService.GetSourceFolderFilesAsync(Recurse);
                 var imgCount = fileNames.Count;
                 int partitionSize = 100;
@@ -476,6 +495,7 @@ namespace DedupWinUI.ViewModels
                     foreach (var image in imagesList) { Images.Add(image); }
                 }
                 await _dataService.InsertBulkImageDataAsync([.. Images]);
+                FilterImages();
                 StatusText = $"{imgCount} images";
                 Log.Information($"Scanning done, found {imgCount} images");
             }

@@ -62,7 +62,8 @@
                     <Grid Width="128">
                         <Image x:Name="ItemImage" Stretch="Uniform"
                                 Height="128" Width="128" 
-                                Source="{x:Bind ThumbnailSource}"/>
+                                Source="{x:Bind ThumbnailSource}"
+                               ToolTipService.ToolTip="{x:Bind RelativePath}"/>
                         <Border Background="Gray" Opacity="0.7"  VerticalAlignment="Bottom">
                             <TextBlock Text="{x:Bind FileName}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
                         </Border>

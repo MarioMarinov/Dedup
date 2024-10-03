@@ -66,9 +66,6 @@ namespace DedupWinUI.ViewModels
         public int MaxSourceGridViewItemSide { get; }
         public int ChangeGridViewItemSideStep { get; }
 
-
-
-
         private List<ImageModel> _images;
         public List<ImageModel> Images
         {

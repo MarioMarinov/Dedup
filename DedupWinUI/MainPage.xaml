@@ -241,7 +241,7 @@
                 <!-- gridsplitter -->
                 <RowDefinition Height="Auto"/>
                 <!-- similar images view -->
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <ScrollViewer>
                 <Grid x:Name="DetailsView"  Visibility="{x:Bind ViewModel.DetailsViewVisibility, Mode=OneWay}"
@@ -371,7 +371,8 @@
                 </Grid>
             </ScrollViewer>
             <controls:GridSplitter Grid.Row="1" Height="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Rows"
-                       Template="{StaticResource VerticalGridSplitterTemplate}"/>
+                       Template="{StaticResource VerticalGridSplitterTemplate}"
+                       Visibility="{x:Bind ViewModel.SelectedSimilarImagesVisibility, Mode=OneWay}"/>
             <Grid Grid.Row="2" Visibility="{x:Bind ViewModel.SelectedSimilarImagesVisibility, Mode=OneWay}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -391,7 +392,34 @@
                           SelectedItem="{x:Bind ViewModel.SelectedSimilarModel, Mode=TwoWay}"
                           SelectionChanged="SimilarImagesGridView_SelectionChanged"/>
             </Grid>
-            
+
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup>
+                    <!-- State when the GridView is visible -->
+                    <VisualState x:Name="GridViewVisible">
+                        <VisualState.StateTriggers>
+                            <local:VisibilityStateTrigger Visibility="{x:Bind ViewModel.SelectedSimilarImagesVisibility}" 
+                                                  TriggerVisibility="Visible" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="RowContent.Height" Value="*" />
+                            <Setter Target="RowGridView.Height" Value="Auto" />
+                        </VisualState.Setters>
+                    </VisualState>
+
+                    <!-- State when the GridView is collapsed -->
+                    <VisualState x:Name="GridViewCollapsed">
+                        <VisualState.StateTriggers>
+                            <local:VisibilityStateTrigger Visibility="{x:Bind ViewModel.SelectedSimilarImagesVisibility}" 
+                                                  TriggerVisibility="Collapsed" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="RowContent.Height" Value="*" />
+                            <Setter Target="RowGridView.Height" Value="0" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
         </Grid>
         
     </Grid>

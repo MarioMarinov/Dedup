@@ -15,6 +15,7 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
     <Page.Resources>
         <conv:DebugConverter x:Key="DebugConverter"/>
+        <conv:NullToBooleanConverter x:Key="NullToBooleanConverter"/>
     </Page.Resources>
     <Grid>
         <Grid.Resources>
@@ -190,11 +191,10 @@
         <controls:GridSplitter Grid.Column="1" Grid.Row="1" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
                                Template="{StaticResource HorizontalGridSplitterTemplate}"/>
         <CommandBar x:Name="ItemDetailsCommandBar" Grid.Column="2" DefaultLabelPosition="Right" VerticalContentAlignment="Center">
-
             <AppBarElementContainer>
                 <SplitButton x:Name="GetSimilarImages" 
-             Loaded="GetSimilarImages_Loaded"
-             Command="{x:Bind ViewModel.GetSimilarImagesCommand}">
+                             Loaded="GetSimilarImages_Loaded"
+                             Command="{x:Bind ViewModel.GetSimilarImagesCommand}">
                     <SplitButton.Content>
                         <StackPanel Orientation="Horizontal">
                             <ContentPresenter x:Name="SelectedIcon" />
@@ -221,7 +221,8 @@
             <AppBarButton Label="Zoom Out" Command="{x:Bind ViewModel.ZoomOutCommand}" Icon="ZoomOut" />
             <AppBarElementContainer VerticalContentAlignment="Center">
                 <Slider x:Name="ScaleSlider" Minimum="10" Maximum="200" StepFrequency="10"  MinWidth="100"
-                        Value="{x:Bind ViewModel.SourceImageScale, Mode=TwoWay}"/>
+                        Value="{x:Bind ViewModel.SourceImageScale, Mode=TwoWay}" 
+                        IsEnabled="{x:Bind ViewModel.ImageIsSelected, Mode=OneWay}"/>
             </AppBarElementContainer>
             <AppBarButton Label="Zoom In" Command="{x:Bind ViewModel.ZoomInCommand}" Icon="ZoomIn"/>
 
@@ -386,7 +387,7 @@
                     <AppBarButton Label="Recycle bin" Icon="Delete"
                                   Click="NavigationButton_Click" CommandParameter="RecycleBinPage"/>
                 </CommandBar>
-                <GridView x:Name="SimilarImagesGridView" Grid.Row="1"
+                <GridView x:Name="SimilarImagesGridView" Grid.Row="1" SelectionMode="Extended"
                           ItemsSource="{x:Bind ViewModel.SimilarImages, Mode=OneWay}"
                           ItemTemplate="{StaticResource GridViewItemDataTemplate}"
                           SelectedItem="{x:Bind ViewModel.SelectedSimilarModel, Mode=TwoWay}"

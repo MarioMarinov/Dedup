@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
+﻿using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
@@ -50,6 +51,13 @@ namespace DedupWinUI.ViewModels
             }
         }
 
+        public bool ImageIsSelected
+        {
+            get
+            {
+                return SelectedModel is not null;
+            }
+        }
         private double _sourceGridViewItemSide;
         public double SourceGridViewItemSide
         {
@@ -163,7 +171,7 @@ namespace DedupWinUI.ViewModels
                 }
             }
         }
-        
+
         private Visibility _selectedSimilarViewVisibility;
         public Visibility SelectedSimilarViewVisibility
         {
@@ -205,7 +213,11 @@ namespace DedupWinUI.ViewModels
                 {
                     _selectedModel = value;
                     RaisePropertyChanged(nameof(SelectedModel));
+                    RaisePropertyChanged(nameof(ImageIsSelected));
                     SelectedViewModel = (_selectedModel == null) ? null : new ImageViewModel(_selectedModel);
+                    ((RelayCommand<string>)GetSimilarImagesCommand).NotifyCanExecuteChanged();
+                    ((RelayCommand)ZoomInCommand).NotifyCanExecuteChanged();
+                    ((RelayCommand)ZoomOutCommand).NotifyCanExecuteChanged();
                 }
             }
         }
@@ -319,6 +331,8 @@ namespace DedupWinUI.ViewModels
                 _sourceImageScale = value;
                 RaisePropertyChanged(nameof(SourceImageScale));
                 SourceImageViewboxScale = new Vector3(value / 100, value / 100, 1);
+                ((RelayCommand)ZoomInCommand).NotifyCanExecuteChanged();
+                ((RelayCommand)ZoomOutCommand).NotifyCanExecuteChanged();
             }
         }
 
@@ -369,8 +383,6 @@ namespace DedupWinUI.ViewModels
             HashImageSize = _settings.HashImageSize;
             Recurse = false;
             SourcePath = settings.Value.SourcePath;
-            SourceImageScale = 100.0f;
-
             ThumbnailSize = _settings.ThumbnailSize;
             Threshold = 0.85f;
 
@@ -389,20 +401,36 @@ namespace DedupWinUI.ViewModels
             DeleteSelectedImagesCommand = new CommandEventHandler<object>(async (_) => await DeleteSelectedImagesAsync());
             DeleteSelectedSimilarImagesCommand = new CommandEventHandler<object>(async (_) => await DeleteSelectedSimilarImagesAsync());
             FilterImagesCommand = new CommandEventHandler<object>((_) => FilterImages());
-            GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
+            GetSimilarImagesCommand = new RelayCommand<string>(option => GetSimilarImages(option), CanGetSimilarImages);
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
             ScanFilesCommand = new CommandEventHandler<object>(async (_) => await ScanFilesAsync());
-            ZoomInCommand = new CommandEventHandler<object>(ZoomInImage);
-            ZoomOutCommand = new CommandEventHandler<object>(ZoomOutImage);
+            ZoomInCommand = new RelayCommand(ZoomInImage, CanZoomInImage);
+            ZoomOutCommand = new RelayCommand(ZoomOutImage, CanZoomOutImage);
+            
             DetailsViewVisibility = Visibility.Collapsed;
             SelectedSimilarViewVisibility = Visibility.Collapsed;
             SelectedSimilarImagesVisibility = Visibility.Collapsed;
+
+            SourceImageScale = 100.0f;
+
             WeakReferenceMessenger.Default.Register<MainViewModel, TreeNodeViewModel>(this, (recipient, node) =>
             {
                 FolderFilterSelectionChanged(node);
             });
         }
+        private bool CanGetSimilarImages(string option)
+        {
+            return SelectedModel is not null;
+        }
 
+        private bool CanZoomInImage()
+        {
+            return SelectedModel is not null && SourceImageScale < 200;
+        }
+        private bool CanZoomOutImage()
+        {
+            return SelectedModel is not null && SourceImageScale > 10;
+        }
 
         private async Task DeleteSelectedImagesAsync()
         {
@@ -412,14 +440,17 @@ namespace DedupWinUI.ViewModels
                 if (SelectedModels.Count == 1)
                 {
                     nextSelectedIndex = FilteredImages.IndexOf(SelectedModels[0]);
+                    if (nextSelectedIndex == FilteredImages.Count)
+                    {
+                        nextSelectedIndex--;
+                    }
                 }
                 if (await DeleteImageAsync(item))
                 {
-                    FilteredImages.Remove(item);
                     StatusText = $"{FilteredImages.Count} images";
                 }
             }
-            if (nextSelectedIndex != -1)
+            if (FilteredImages.Any() && nextSelectedIndex != -1)
             {
                 SelectedModel = FilteredImages[nextSelectedIndex];
             }
@@ -429,7 +460,17 @@ namespace DedupWinUI.ViewModels
         {
             try
             {
-                return (await _appService.DeleteImageAsync(model));
+                var deleted = await _appService.DeleteImageAsync(model);
+                if (deleted)
+                {
+                    FilteredImages.Remove(model);
+                    SimilarImages.Remove(model);
+                    if (SelectedSimilarModel == model)
+                    {
+                        SelectedSimilarModel = default;
+                    }
+                }
+                return deleted;
             }
             catch (Exception ex)
             {
@@ -446,10 +487,14 @@ namespace DedupWinUI.ViewModels
                 if (SelectedSimilarImages.Count == 1)
                 {
                     nextSelectedIndex = SimilarImages.IndexOf(SelectedSimilarImages[0]);
+                    if (nextSelectedIndex == SimilarImages.Count)
+                    {
+                        nextSelectedIndex--;
+                    }
                 }
                 await DeleteImageAsync(item);
             }
-            if (nextSelectedIndex != -1)
+            if (SimilarImages.Any() && nextSelectedIndex != -1)
             {
                 SelectedSimilarModel = SimilarImages[nextSelectedIndex];
             }
@@ -480,7 +525,7 @@ namespace DedupWinUI.ViewModels
         /// <summary>
         /// Scans the specified source for similar images
         /// </summary>
-        /// <param name="path">"Repo" to search globally, 
+        /// <param name="option">"Repo" to search globally, 
         /// "Folder" to search in the current folder</param>
         private void GetSimilarImages(string option)
         {
@@ -553,23 +598,6 @@ namespace DedupWinUI.ViewModels
 
         }
 
-        private void FilterImages()
-        {
-            if (FolderFilterApplied && SelectedFolderFilterItems.Count > 0)
-            {
-                var selectedFolders = SelectedFolderFilterItems.Select(x => x.RelativePath).ToArray();
-                FilteredImages = new ObservableCollection<ImageModel>(
-                    Images.Where(i => selectedFolders.Contains(i.RelativePath))
-                    );
-                Log.Information($"{FilteredImages.Count} filtered images displayed");
-            }
-            else
-            {
-                FilteredImages = new ObservableCollection<ImageModel>(Images);
-                Log.Information($"{FilteredImages.Count} unfiltered images displayed");
-            }
-        }
-
         private void ApplyFilter()
         {
             FolderFilterApplied = SelectedFolderFilterItems.Count > 0;
@@ -586,11 +614,29 @@ namespace DedupWinUI.ViewModels
             Log.Information("Cleared filter");
             FilterImages();
         }
+        
         private void ClearSimilarImages()
         {
-            SimilarImages= [];
+            SimilarImages = [];
             SelectedSimilarModel = default;
             Log.Information("Cleared similar images list");
+        }
+
+        private void FilterImages()
+        {
+            if (FolderFilterApplied && SelectedFolderFilterItems.Count > 0)
+            {
+                var selectedFolders = SelectedFolderFilterItems.Select(x => x.RelativePath).ToArray();
+                FilteredImages = new ObservableCollection<ImageModel>(
+                    Images.Where(i => selectedFolders.Contains(i.RelativePath))
+                    );
+                Log.Information($"{FilteredImages.Count} filtered images displayed");
+            }
+            else
+            {
+                FilteredImages = new ObservableCollection<ImageModel>(Images);
+                Log.Information($"{FilteredImages.Count} unfiltered images displayed");
+            }
         }
 
         private void FolderFilterSelectionChanged(TreeNodeViewModel node)
@@ -614,20 +660,14 @@ namespace DedupWinUI.ViewModels
             throw new NotImplementedException();
         }
 
-        private void ZoomInImage(object _)
+        private void ZoomInImage()
         {
-            if (SourceImageScale < 200)
-            {
-                SourceImageScale += 10;
-            }
+            SourceImageScale += 10;
         }
 
-        private void ZoomOutImage(object _)
+        private void ZoomOutImage()
         {
-            if (SourceImageScale > 10)
-            {
-                SourceImageScale -= 10;
-            }
+            SourceImageScale -= 10;
         }
 
     }

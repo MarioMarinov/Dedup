@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -79,7 +80,6 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-
         private ObservableCollection<ImageModel> _filteredImages;
         public ObservableCollection<ImageModel> FilteredImages
         {
@@ -91,6 +91,20 @@ namespace DedupWinUI.ViewModels
             }
         }
 
+        private Visibility _selectedSimilarImagesVisibility;
+        public Visibility SelectedSimilarImagesVisibility
+        {
+            get { return _selectedSimilarImagesVisibility; }
+            private set
+            {
+                if (_selectedSimilarImagesVisibility != value)
+                {
+                    _selectedSimilarImagesVisibility = value;
+                    RaisePropertyChanged(nameof(SelectedSimilarImagesVisibility));
+                }
+            }
+        }
+
         private ObservableCollection<ImageModel> _similarImages;
         public ObservableCollection<ImageModel> SimilarImages
         {
@@ -99,6 +113,22 @@ namespace DedupWinUI.ViewModels
             {
                 _similarImages = value;
                 RaisePropertyChanged(nameof(SimilarImages));
+                SelectedSimilarImagesVisibility = (SimilarImages.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
+                SelectedSimilarModel = null;
+            }
+        }
+
+        private List<ImageModel> _selectedSimilarImages;
+        public List<ImageModel> SelectedSimilarImages
+        {
+            get { return _selectedSimilarImages; }
+            set
+            {
+                if (_selectedSimilarImages != value)
+                {
+                    _selectedSimilarImages = value;
+                    RaisePropertyChanged(nameof(SelectedSimilarImages));
+                }
             }
         }
 
@@ -133,7 +163,7 @@ namespace DedupWinUI.ViewModels
                 }
             }
         }
-
+        
         private Visibility _selectedSimilarViewVisibility;
         public Visibility SelectedSimilarViewVisibility
         {
@@ -278,7 +308,7 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-        
+
         private float _sourceImageScale;
         public float SourceImageScale
         {
@@ -311,7 +341,9 @@ namespace DedupWinUI.ViewModels
         #region Commands
         public ICommand ApplyFilterCommand { get; }
         public ICommand ClearFilterCommand { get; }
-        public ICommand DeleteFilesCommand { get; }
+        public ICommand ClearSimilarImagesList { get; }
+        public ICommand DeleteSelectedImagesCommand { get; }
+        public ICommand DeleteSelectedSimilarImagesCommand { get; }
         public ICommand FolderFilterSelectionChangeCommand { get; }
         public ICommand FilterImagesCommand { get; }
         public ICommand GetSimilarImagesCommand { get; }
@@ -333,7 +365,7 @@ namespace DedupWinUI.ViewModels
             _appService = appService;
             _dataService = dataService;
             _logger = logger;
-            
+
             HashImageSize = _settings.HashImageSize;
             Recurse = false;
             SourcePath = settings.Value.SourcePath;
@@ -342,7 +374,7 @@ namespace DedupWinUI.ViewModels
             ThumbnailSize = _settings.ThumbnailSize;
             Threshold = 0.85f;
 
-            
+
             MinSourceGridViewItemSide = ThumbnailSize / 3;
             MaxSourceGridViewItemSide = ThumbnailSize;
             SourceGridViewItemSide = ThumbnailSize;
@@ -353,7 +385,9 @@ namespace DedupWinUI.ViewModels
             SimilarImages = [];
             ApplyFilterCommand = new CommandEventHandler<object>((_) => ApplyFilter());
             ClearFilterCommand = new CommandEventHandler<object>((_) => ClearFilter());
-            DeleteFilesCommand = new CommandEventHandler<object>(async (_) => await DeleteFilesAsync());
+            ClearSimilarImagesList = new CommandEventHandler<object>((_) => ClearSimilarImages());
+            DeleteSelectedImagesCommand = new CommandEventHandler<object>(async (_) => await DeleteSelectedImagesAsync());
+            DeleteSelectedSimilarImagesCommand = new CommandEventHandler<object>(async (_) => await DeleteSelectedSimilarImagesAsync());
             FilterImagesCommand = new CommandEventHandler<object>((_) => FilterImages());
             GetSimilarImagesCommand = new CommandEventHandler<string>((option) => GetSimilarImages(option));
             RenameFileCommand = new CommandEventHandler<string>((path) => RenameFile(path));
@@ -362,6 +396,7 @@ namespace DedupWinUI.ViewModels
             ZoomOutCommand = new CommandEventHandler<object>(ZoomOutImage);
             DetailsViewVisibility = Visibility.Collapsed;
             SelectedSimilarViewVisibility = Visibility.Collapsed;
+            SelectedSimilarImagesVisibility = Visibility.Collapsed;
             WeakReferenceMessenger.Default.Register<MainViewModel, TreeNodeViewModel>(this, (recipient, node) =>
             {
                 FolderFilterSelectionChanged(node);
@@ -369,7 +404,7 @@ namespace DedupWinUI.ViewModels
         }
 
 
-        private async Task DeleteFilesAsync()
+        private async Task DeleteSelectedImagesAsync()
         {
             var nextSelectedIndex = -1;
             foreach (var item in SelectedModels)
@@ -378,7 +413,11 @@ namespace DedupWinUI.ViewModels
                 {
                     nextSelectedIndex = FilteredImages.IndexOf(SelectedModels[0]);
                 }
-                await DeleteModelAsync(item);
+                if (await DeleteImageAsync(item))
+                {
+                    FilteredImages.Remove(item);
+                    StatusText = $"{FilteredImages.Count} images";
+                }
             }
             if (nextSelectedIndex != -1)
             {
@@ -386,23 +425,33 @@ namespace DedupWinUI.ViewModels
             }
         }
 
-
-        public async Task<bool> DeleteModelAsync(ImageModel model)
+        public async Task<bool> DeleteImageAsync(ImageModel model)
         {
             try
             {
-                var deleted = await _appService.DeleteImageAsync(model);
-                if (deleted)
-                {
-                    FilteredImages.Remove(model);
-                    StatusText = $"{FilteredImages.Count} images";
-                }
-                return deleted;
+                return (await _appService.DeleteImageAsync(model));
             }
             catch (Exception ex)
             {
                 Log.Error($"Unable to delete a model: {ex.Message}");
                 throw;
+            }
+        }
+
+        private async Task DeleteSelectedSimilarImagesAsync()
+        {
+            var nextSelectedIndex = -1;
+            foreach (var item in SelectedSimilarImages)
+            {
+                if (SelectedSimilarImages.Count == 1)
+                {
+                    nextSelectedIndex = SimilarImages.IndexOf(SelectedSimilarImages[0]);
+                }
+                await DeleteImageAsync(item);
+            }
+            if (nextSelectedIndex != -1)
+            {
+                SelectedSimilarModel = SimilarImages[nextSelectedIndex];
             }
         }
 
@@ -534,7 +583,14 @@ namespace DedupWinUI.ViewModels
                 SelectedFolderFilterItems[i].IsChecked = false;
             }
             FolderFilterApplied = false;
+            Log.Information("Cleared filter");
             FilterImages();
+        }
+        private void ClearSimilarImages()
+        {
+            SimilarImages= [];
+            SelectedSimilarModel = default;
+            Log.Information("Cleared similar images list");
         }
 
         private void FolderFilterSelectionChanged(TreeNodeViewModel node)

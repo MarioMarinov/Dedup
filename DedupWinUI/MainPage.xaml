@@ -167,9 +167,8 @@
 
             <AppBarSeparator/>
 
-            <AppBarButton x:Name="DeleteSourceButton" Label="Delete" Icon="Cancel" Foreground="Red"
-                          Command="{x:Bind ViewModel.DeleteFilesCommand}" 
-                          CommandParameter="{x:Bind ViewModel.SelectedModels, Mode=TwoWay}"/>
+            <AppBarButton Label="Delete" Icon="Cancel" Foreground="Red"
+                          Command="{x:Bind ViewModel.DeleteSelectedImagesCommand}"/>
             <AppBarButton x:Name="RecycleBinButton" Label="Recycle bin" Icon="Delete"
                           Click="NavigationButton_Click" CommandParameter="RecycleBinPage"/>
             
@@ -373,10 +372,26 @@
             </ScrollViewer>
             <controls:GridSplitter Grid.Row="1" Height="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Rows"
                        Template="{StaticResource VerticalGridSplitterTemplate}"/>
-            <GridView x:Name="SimilarImagesGridView" Grid.Row="2"
-                      ItemsSource="{x:Bind ViewModel.SimilarImages, Mode=OneWay}"
-                      ItemTemplate="{StaticResource GridViewItemDataTemplate}"
-                      SelectedItem="{x:Bind ViewModel.SelectedSimilarModel, Mode=TwoWay}"/>
+            <Grid Grid.Row="2" Visibility="{x:Bind ViewModel.SelectedSimilarImagesVisibility, Mode=OneWay}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <CommandBar DefaultLabelPosition="Right">
+                    <AppBarButton Label="Clear" Icon="Clear"
+                                  Command="{x:Bind ViewModel.ClearSimilarImagesList}"/>
+                    <AppBarButton Label="Delete" Icon="Cancel" Foreground="Red"
+                                  Command="{x:Bind ViewModel.DeleteSelectedSimilarImagesCommand}"/>
+                    <AppBarButton Label="Recycle bin" Icon="Delete"
+                                  Click="NavigationButton_Click" CommandParameter="RecycleBinPage"/>
+                </CommandBar>
+                <GridView x:Name="SimilarImagesGridView" Grid.Row="1"
+                          ItemsSource="{x:Bind ViewModel.SimilarImages, Mode=OneWay}"
+                          ItemTemplate="{StaticResource GridViewItemDataTemplate}"
+                          SelectedItem="{x:Bind ViewModel.SelectedSimilarModel, Mode=TwoWay}"
+                          SelectionChanged="SimilarImagesGridView_SelectionChanged"/>
+            </Grid>
+            
         </Grid>
         
     </Grid>

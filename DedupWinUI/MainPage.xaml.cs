@@ -35,7 +35,7 @@ namespace DedupWinUI
             if (e.Key == VirtualKey.Delete && ViewModel.SelectedModels!=null)
             {
                 var index = ViewModel.Images.IndexOf(ViewModel.SelectedModel);
-                ViewModel.DeleteFilesCommand.Execute(null);
+                ViewModel.DeleteSelectedImagesCommand.Execute(null);
                 if (index < ViewModel.Images.Count)
                 {
                     ViewModel.SelectedModel = ViewModel.Images[index];
@@ -97,5 +97,9 @@ namespace DedupWinUI
             ViewModel.SelectedModels = ItemsGridView.SelectedItems.Cast<ImageModel>().ToList();
         }
 
+        private void SimilarImagesGridView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ViewModel.SelectedSimilarImages = SimilarImagesGridView.SelectedItems.Cast<ImageModel>().ToList();
+        }
     }
 }

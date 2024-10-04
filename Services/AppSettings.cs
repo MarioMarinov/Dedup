@@ -1,15 +1,18 @@
 ﻿using Microsoft.Extensions.Configuration;
+using System;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
 
 namespace Services
 {
     public class AppSettings
     {
         #region Configured in appsettings.json
-        public required string[] Extensions { get; set; }
-        public required int HashImageSize { get; set; }
-        public required string SourcePath { get; set; }
-        public required string ThumbnailDbDir { get; set; }
-        public required int ThumbnailSize { get; set; }
+        public string[] Extensions { get; set; }
+        public int HashImageSize { get; set; }
+        public string SourcePath { get; set; }
+        public string ThumbnailDbDir { get; set; }
+        public int ThumbnailSize { get; set; }
         #endregion
 
         /// <summary>
@@ -47,22 +50,41 @@ namespace Services
         const string LogFolder = "Logs";
         const string RecycleBinFolder = "Deleted";
         const string ThumbnailsFolder = "thumbnails-test";
-        
-        #endregion
 
+        #endregion
         public AppSettings()
         {
             var config = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                //.AddEnvironmentVariables()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true) 
+                .AddEnvironmentVariables()
                 .Build();
-            var thumbnailDbDir = config.GetValue<string>("AppSettings:ThumbnailDbDir") ?? String.Empty; 
-            ThumbnailsPath = Path.Combine(thumbnailDbDir, ThumbnailsFolder);
-            RecycleBinPath = Path.Combine(thumbnailDbDir, RecycleBinFolder);
-            LogPath = Path.Combine(thumbnailDbDir, LogFolder);
-            var serilogWriteTo = config["Serilog:WriteTo:0:Args:path"];
-            SerilogPath = Path.Combine(LogPath, serilogWriteTo ?? DefaultLogFileName);
-            DbFilePath = Path.Combine(thumbnailDbDir, DbFileName);
+
+            InitializeSettings(config);
+        }
+
+        [SetsRequiredMembers]
+        public AppSettings(IConfiguration configuration)
+        {
+            InitializeSettings(configuration);
+        }
+
+        // Private method to initialize common settings
+        private void InitializeSettings(IConfiguration config)
+        {
+            // Required values are read from the configuration or fallback to default values
+            SourcePath = config["AppSettings:SourcePath"] ?? "DefaultSourcePath";  // Set a default or throw exception if required
+            ThumbnailDbDir = config["AppSettings:ThumbnailDbDir"] ?? "DefaultThumbnailDbDir";
+            Extensions = config["AppSettings:Extensions"]?.Split(',') ?? Array.Empty<string>();
+            HashImageSize = int.Parse(config["AppSettings:HashImageSize"] ?? "64");  // Example default
+            ThumbnailSize = int.Parse(config["AppSettings:ThumbnailSize"] ?? "192"); // Example default
+
+            // Initialize the paths using shared logic
+            ThumbnailsPath = Path.Combine(ThumbnailDbDir, ThumbnailsFolder);
+            RecycleBinPath = Path.Combine(ThumbnailDbDir, RecycleBinFolder);
+            LogPath = Path.Combine(ThumbnailDbDir, LogFolder);
+            SerilogPath = Path.Combine(LogPath, config["Serilog:WriteTo:0:Args:path"] ?? DefaultLogFileName);
+            DbFilePath = Path.Combine(ThumbnailDbDir, DbFileName);
         }
     }
 }

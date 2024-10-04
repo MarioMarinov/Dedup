@@ -1,7 +1,13 @@
 ﻿using Microsoft.Extensions.Options;
 using Serilog;
 using Services.Models;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Services
 {
@@ -27,7 +33,7 @@ namespace Services
             try
             {
                 //Try to move to recycle bin first, failure to move effectively cancels the whole deletion
-                if (await FileService.MoveFileAsync(model.FilePath, destFilePath))
+                if (await fileService.MoveFileAsync(model.FilePath, destFilePath))
                 {
                     File.Delete(model.ThumbnailSource);
                     File.Delete(model.ImageHashSource);

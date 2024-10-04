@@ -1,9 +1,14 @@
 ﻿using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
 using Shipwreck.Phash;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Services
 {
@@ -113,7 +118,7 @@ namespace Services
             return (relPath == ".") ? string.Empty : relPath;
         }
 
-        public static async Task<bool> DeleteFile(string imagePath)
+        public async Task<bool> DeleteFileAsync(string imagePath)
         {
             int attempts = 0;
             while (attempts < 5)
@@ -133,7 +138,7 @@ namespace Services
             return false;
         }
 
-        public static async Task<bool> MoveFileAsync(string sourcePath, string destinationPath)
+        public async Task<bool> MoveFileAsync(string sourcePath, string destinationPath)
         {
             int attempts = 0;
             while (attempts < 5)

@@ -2,7 +2,7 @@
 
 namespace Services.Models
 {
-    public class ImageModel(string fileName, string relativePath, long length, string? imageHash)
+    public class ImageModel(string fileName, string relativePath, long length, string? imageHash = null)
     {
         /// <summary>
         /// Source Image file name

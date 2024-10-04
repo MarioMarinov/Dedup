@@ -11,5 +11,7 @@ namespace Services
         public string GetRelPath(string fullFilePath);
         public string GetRelPath(string rootPath, string fullFilePath);
         public Task<bool> SaveImageAsync(Bitmap image, string filePath);
+        public Task<bool> MoveFileAsync(string sourcePath, string destinationPath);
+        public Task<bool> DeleteFileAsync(string imagePath);
     }
 }

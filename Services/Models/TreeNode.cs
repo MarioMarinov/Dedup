@@ -1,4 +1,6 @@
-﻿namespace Services.Models
+﻿using System.Collections.Generic;
+
+namespace Services.Models
 {
     public class TreeNode
     {

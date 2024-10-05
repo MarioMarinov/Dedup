@@ -22,6 +22,11 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+    - name: Install .NET Workloads
+      run: |
+        dotnet workload install winui
+        dotnet workload update
+
     - name: Restore dependencies
       run: dotnet restore --property:EnableWindowsTargeting=true
 

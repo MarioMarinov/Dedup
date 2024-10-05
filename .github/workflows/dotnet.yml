@@ -22,9 +22,9 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    - name: Install .NET Workloads
+    - name: Install Windows Workload
       run: |
-        dotnet workload install winui
+        dotnet workload install windows
         dotnet workload update
 
     - name: Restore dependencies

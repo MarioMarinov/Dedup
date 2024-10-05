@@ -1,26 +1,22 @@
 ﻿using Microsoft.Extensions.Options;
-using Microsoft.Web.WebView2.Core;
-using Shipwreck.Phash;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Services
 {
     public class FileService : IFileService
     {
-
+        readonly IDirectoryWrapper _directoryWrapper;
+        readonly IFileWrapper _fileWrapper;
         readonly AppSettings _settings;
 
-        public FileService(IOptions<AppSettings> settings)
+        public FileService(IOptions<AppSettings> settings, IDirectoryWrapper directoryWrapper, IFileWrapper fileWrapper)
         {
             _settings = settings.Value;
-        
+            _directoryWrapper = directoryWrapper;
+            _fileWrapper = fileWrapper;
+            
             CreateThumbnailDbRoot();
             CreateRecycleBinRoot();
         }
@@ -28,24 +24,18 @@ namespace Services
         public async Task<List<string>> EnumerateFilteredFilesAsync(string dir, string[] extensions, SearchOption searchOption = SearchOption.TopDirectoryOnly)
         {
             var allFiles = new ConcurrentBag<string>();
-            var filderedOutFiles = new ConcurrentBag<string>();
             await Task.Run(() =>
             {
-                var files = Directory.EnumerateFiles(dir, "*.*", searchOption);
+                var files = _directoryWrapper.EnumerateFiles(dir, "*.*", searchOption);
                 Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, filePath =>
                 {
                     var fileInfo = new FileInfo(filePath);
-                    if (fileInfo.Length > 0 && extensions.Contains(fileInfo.Extension))
+                    if (extensions.Contains(fileInfo.Extension, StringComparer.OrdinalIgnoreCase))
                     {
                         allFiles.Add(filePath);
                     }
-                    else
-                    {
-                        filderedOutFiles.Add(filePath);
-                    }
                 });
-        }).ConfigureAwait(false);
-
+            });
             return [.. allFiles];
         }
 
@@ -92,20 +82,6 @@ namespace Services
             return false;
         }
         
-        public string ConvertSourcePathToThumbnailPath(string fullFilePath)
-        {
-            var relPath = fullFilePath[_settings.SourcePath.Length..];
-            var destPath = Path.Combine(_settings.ThumbnailsPath, relPath);
-            return destPath;
-        }
-
-        public string ConvertThumbnailPathToSourcePath(string fullThumbnailPath)
-        {
-            var relPath = fullThumbnailPath[_settings.ThumbnailsPath.Length..];
-            var sourcePath = Path.Combine(_settings.SourcePath, relPath);
-            return sourcePath;
-        }
-
         public string GetRelPath(string fullFilePath)
         {
             var relPath = GetRelPath(_settings.SourcePath, fullFilePath);
@@ -125,7 +101,7 @@ namespace Services
             {
                 try
                 {
-                    await Task.Run(() => File.Delete(imagePath));
+                    await Task.Run(() => _fileWrapper.Delete(imagePath));
                     return true;
                 }
                 catch (IOException)
@@ -145,13 +121,13 @@ namespace Services
             {
                 try
                 {
-                    await Task.Run(()=>File.Move(sourcePath, destinationPath));
+                    await Task.Run(() => _fileWrapper.Move(sourcePath, destinationPath));
                     return true;
                 }
                 catch (IOException)
                 {
                     attempts++;
-                    await Task.Delay(100); 
+                    await Task.Delay(100);
                     if (attempts == 5) throw;
                 }
             }

@@ -36,7 +36,9 @@ namespace Services
                     }
                 });
             });
-            return [.. allFiles];
+            var res = allFiles.ToList();
+            res.Sort();
+            return res;
         }
 
         private void CreateThumbnailDbRoot()

@@ -16,13 +16,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
+
+    - name: Install Windows App SDK
+      run: dotnet add package Microsoft.WindowsAppSDK --version 1.6.240923002
+
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --property:EnableWindowsTargeting=true
+
     - name: Build
       run: dotnet build --no-restore --property:EnableWindowsTargeting=true
+      
     - name: Test
       run: dotnet test --no-build --verbosity normal

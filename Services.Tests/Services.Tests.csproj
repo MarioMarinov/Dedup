@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
-    <SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>
+    <!--<SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>-->
     <WindowsSdkPackageVersion>10.0.26100.41</WindowsSdkPackageVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -10,8 +10,10 @@
     <IsTestProject>true</IsTestProject>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &gt;= 8">win-x86;win-x64;win-arm64</RuntimeIdentifiers>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <EnableWindowsTargeting>false</EnableWindowsTargeting>
     <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
+    <UseWinUI>false</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,7 +25,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240311000" />
+    <!--<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240311000" />-->
   </ItemGroup>
 
   <ItemGroup>

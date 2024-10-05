@@ -14,6 +14,7 @@
     <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
     <UseWinUI>false</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
   </PropertyGroup>
 
   <ItemGroup>

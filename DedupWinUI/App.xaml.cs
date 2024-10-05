@@ -36,6 +36,8 @@ namespace DedupWinUI
                 .ConfigureServices((context, services) =>
                 {
                     services.Configure<AppSettings>(context.Configuration.GetSection("AppSettings"));
+                    services.AddTransient<IFileWrapper, FileWrapper>();
+                    services.AddTransient<IDirectoryWrapper, DirectoryWrapper>();
                     services.AddTransient<IFileService, FileService>();
                     services.AddTransient<IImagingService, ImagingService>();
                     services.AddTransient<IDataService, DataService>();

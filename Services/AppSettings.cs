@@ -45,12 +45,16 @@ namespace Services
         public const string ThumbnailPrefix = "th_";
         public const string HashImagePrefix = "ih_";
         
-        const string DbFileName = "thumbs1.db";
         const string DefaultLogFileName = "log.txt";
+        const string DefaultHashImageSize = "64";
+        const string DefaultThumbnailSize = "192";
+
+        const string DbFileName = "thumbs1.db";
         const string LogFolder = "Logs";
         const string RecycleBinFolder = "Deleted";
         const string ThumbnailsFolder = "thumbnails-test";
-
+        const string AppDataFolder = "DedupWinUi";
+        
         #endregion
         public AppSettings()
         {
@@ -72,12 +76,19 @@ namespace Services
         // Private method to initialize common settings
         private void InitializeSettings(IConfiguration config)
         {
+            var localAppDataPath = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+            if (string.IsNullOrEmpty(localAppDataPath))
+            {
+                throw new DirectoryNotFoundException("The LocalApplicationData path is not available.");
+            }
+            string picturesFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+
             // Required values are read from the configuration or fallback to default values
-            SourcePath = config["AppSettings:SourcePath"] ?? "DefaultSourcePath";  // Set a default or throw exception if required
-            ThumbnailDbDir = config["AppSettings:ThumbnailDbDir"] ?? "DefaultThumbnailDbDir";
-            Extensions = config["AppSettings:Extensions"]?.Split(',') ?? Array.Empty<string>();
-            HashImageSize = int.Parse(config["AppSettings:HashImageSize"] ?? "64");  // Example default
-            ThumbnailSize = int.Parse(config["AppSettings:ThumbnailSize"] ?? "192"); // Example default
+            SourcePath = config["AppSettings:SourcePath"] ?? picturesFolderPath;  
+            ThumbnailDbDir = config["AppSettings:ThumbnailDbDir"] ?? Path.Combine(localAppDataPath, AppDataFolder);
+            Extensions = config["AppSettings:Extensions"]?.Split(',') ?? [".bmp", ".BMP", ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG"];
+            HashImageSize = int.Parse(config["AppSettings:HashImageSize"] ?? "64");  
+            ThumbnailSize = int.Parse(config["AppSettings:ThumbnailSize"] ?? "192"); 
 
             // Initialize the paths using shared logic
             ThumbnailsPath = Path.Combine(ThumbnailDbDir, ThumbnailsFolder);

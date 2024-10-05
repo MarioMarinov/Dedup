@@ -57,40 +57,33 @@ namespace Services.Tests
         }
 
         [Fact]
-        public void AppSettings_ShouldThrowException_WhenMissingRequiredSettings()
-        {
-            // Arrange
-            var configValues = new Dictionary<string, string>(); // Empty configuration
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(configValues)
-                .Build();
-
-            // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => new AppSettings(configuration));
-        }
-
-        [Fact]
         public void AppSettings_ShouldAssignDefaults_WhenValuesAreMissingInConfiguration()
         {
-            // Arrange
+            //-- Arrange --
             var configValues = new Dictionary<string, string>
-        {
-            {"AppSettings:SourcePath", "\\\\Server\\Media\\Photos"}
-            // Missing other values, should fall back to defaults or empty
-        };
+            {
+                {"AppSettings:SourcePath", "D:\\Users\\Mario\\Pictures"}
+                // Missing other values, should fall back to defaults or empty
+            };
 
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(configValues)
                 .Build();
-
-            // Act
+            //Source path default to "My Pictures". As it is user specific the defaults have to be adapted
+            //for a different user/machine
+            string picturesFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            
+            //default to local user app data folder
+            var localAppDataPath = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+            
+            //-- Act --
             var appSettings = new AppSettings(configuration);
 
-            // Assert
-            Assert.Equal("\\\\Server\\Media\\Photos", appSettings.SourcePath);
-            Assert.Empty(appSettings.Extensions);  // Default should be an empty array
-            Assert.Equal(0, appSettings.ThumbnailSize); // Default integer value
-            Assert.Equal(0, appSettings.HashImageSize);
+            //-- Assert --
+            Assert.Equal("D:\\Users\\Mario\\Pictures", appSettings.SourcePath);
+            Assert.Equal([".bmp", ".BMP", ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG"], appSettings.Extensions);  // Default should be an empty array
+            Assert.Equal(192, appSettings.ThumbnailSize); 
+            Assert.Equal(64, appSettings.HashImageSize);
         }
 
         [Fact]

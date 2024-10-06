@@ -1,15 +1,8 @@
-﻿using Microsoft.UI.Xaml.Media.Imaging;
-using Shipwreck.Phash;
+﻿using Shipwreck.Phash;
 using Shipwreck.Phash.Bitmaps;
-using Shipwreck.Phash.Imaging;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
 
 
@@ -17,7 +10,7 @@ namespace Services
 {
     public class ImagingService : IImagingService
     {
-        private static Bitmap AdjustBitmapOrientation(Bitmap bitmap, int orientation)
+        public static Bitmap AdjustBitmapOrientation(Bitmap bitmap, int orientation)
         {
             switch (orientation)
             {
@@ -54,22 +47,8 @@ namespace Services
             return sBmp;
         }
         
-        public static BitmapSource ConvertBitmapToBitmapSource(Bitmap bitmap)
-        {
-            var exifOrientation = GetExifOrientation(bitmap);
-            bitmap = AdjustBitmapOrientation(bitmap, exifOrientation);
-            using MemoryStream memoryStream = new();
-            // Save the bitmap to the memory stream
-            bitmap.Save(memoryStream, ImageFormat.Png);
-            memoryStream.Position = 0;
-
-            // Create a new BitmapImage
-            BitmapImage bitmapImage = new();
-            bitmapImage.SetSource(memoryStream.AsRandomAccessStream());
-
-            return bitmapImage;
-        }
-        private static int GetExifOrientation(Bitmap bitmap)
+        
+        public static int GetExifOrientation(Bitmap bitmap)
         {
             // Retrieve EXIF orientation data
             const int ExifOrientationId = 0x112; // Orientation tag

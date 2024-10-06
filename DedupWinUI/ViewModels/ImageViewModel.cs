@@ -5,6 +5,7 @@ using Services.Models;
 using Shipwreck.Phash.Bitmaps;
 using System;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using Windows.Graphics.Imaging;
 
@@ -66,14 +67,29 @@ namespace DedupWinUI.ViewModels
             CreationTime = fi.CreationTime;
             using (var bmp = new Bitmap(model.ThumbnailSource))
             {
-                Thumbnail = ImagingService.ConvertBitmapToBitmapSource(bmp);
+                Thumbnail = ConvertBitmapToBitmapSource(bmp);
             }
             using (var bmp = new Bitmap(model.FilePath)) {
-                Image = ImagingService.ConvertBitmapToBitmapSource(bmp);
+                Image = ConvertBitmapToBitmapSource(bmp);
                 Dimensions = new Size(bmp.Width, bmp.Height);
             }
             
         }
 
+        public BitmapSource ConvertBitmapToBitmapSource(Bitmap bitmap)
+        {
+            var exifOrientation = ImagingService.GetExifOrientation(bitmap);
+            bitmap = ImagingService.AdjustBitmapOrientation(bitmap, exifOrientation);
+            using MemoryStream memoryStream = new();
+            // Save the bitmap to the memory stream
+            bitmap.Save(memoryStream, ImageFormat.Png);
+            memoryStream.Position = 0;
+
+            // Create a new BitmapImage
+            BitmapImage bitmapImage = new();
+            bitmapImage.SetSource(memoryStream.AsRandomAccessStream());
+
+            return bitmapImage;
+        }
     }
 }

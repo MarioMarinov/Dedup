@@ -8,7 +8,7 @@ namespace Services.Tests
         public void AppSettings_ShouldInitialize_WithValidConfiguration()
         {
             // Arrange
-            var configValues = new Dictionary<string, string>
+            var configValues = new Dictionary<string, string?>
             {
                 {"AppSettings:SourcePath", "\\\\Server\\Media\\Photos"},
                 {"AppSettings:ThumbnailDbDir", "D:\\Temp\\Dedup"},
@@ -55,7 +55,7 @@ namespace Services.Tests
         public void AppSettings_ShouldAssignDefaults_WhenValuesAreMissingInConfiguration()
         {
             //-- Arrange --
-            var configValues = new Dictionary<string, string>
+            var configValues = new Dictionary<string, string?>
             {
                 {"AppSettings:SourcePath", "D:\\Users\\Mario\\Pictures"}
                 // Missing other values, should fall back to defaults or empty
@@ -85,7 +85,7 @@ namespace Services.Tests
         public void AppSettings_ShouldConstructPathsCorrectly()
         {
             // Arrange
-            var configValues = new Dictionary<string, string>
+            var configValues = new Dictionary<string, string?>
         {
             {"AppSettings:ThumbnailDbDir", "D:\\Temp\\Dedup"}
         };

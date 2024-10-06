@@ -54,8 +54,9 @@ namespace Services
         const string RecycleBinFolder = "Deleted";
         const string ThumbnailsFolder = "thumbnails-test";
         const string AppDataFolder = "DedupWinUi";
-        
+
         #endregion
+        [SetsRequiredMembers]
         public AppSettings()
         {
             var config = new ConfigurationBuilder()
@@ -74,6 +75,8 @@ namespace Services
         }
 
         // Private method to initialize common settings
+        [MemberNotNull(nameof(DbFilePath), nameof(Extensions), nameof(LogPath), nameof(RecycleBinPath), 
+            nameof(SerilogPath), nameof(SourcePath), nameof(ThumbnailsPath), nameof(ThumbnailDbDir))]
         private void InitializeSettings(IConfiguration config)
         {
             var localAppDataPath = Environment.GetEnvironmentVariable("LOCALAPPDATA");
@@ -87,8 +90,8 @@ namespace Services
             SourcePath = config["AppSettings:SourcePath"] ?? picturesFolderPath;  
             ThumbnailDbDir = config["AppSettings:ThumbnailDbDir"] ?? Path.Combine(localAppDataPath, AppDataFolder);
             Extensions = config["AppSettings:Extensions"]?.Split(',') ?? [".bmp", ".BMP", ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG"];
-            HashImageSize = int.Parse(config["AppSettings:HashImageSize"] ?? "64");  
-            ThumbnailSize = int.Parse(config["AppSettings:ThumbnailSize"] ?? "192"); 
+            HashImageSize = int.Parse(config["AppSettings:HashImageSize"] ?? DefaultHashImageSize);  
+            ThumbnailSize = int.Parse(config["AppSettings:ThumbnailSize"] ?? DefaultThumbnailSize); 
 
             // Initialize the paths using shared logic
             ThumbnailsPath = Path.Combine(ThumbnailDbDir, ThumbnailsFolder);

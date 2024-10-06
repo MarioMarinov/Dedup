@@ -41,7 +41,6 @@ namespace Services.Tests
             // Initialize AppService with mocked dependencies
             _appService = new AppService(
                 _fileServiceMock.Object,
-                _imagingServiceMock.Object,
                 _dataServiceMock.Object,
                 _appSettingsOptions);
         }
